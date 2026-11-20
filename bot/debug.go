@@ -1,0 +1,27 @@
+package bot
+
+import (
+	"fmt"
+	"os"
+)
+
+// Debug, when set, prints a status line per decision to stderr.
+var Debug = os.Getenv("MECH_DEBUG") != ""
+
+// DebugSlot limits tracing to one slot (-1 = all).
+var DebugSlot = -1
+
+func (b *Bot) trace(act interface{}) {
+	if !Debug || (DebugSlot >= 0 && b.slot != DebugSlot) {
+		return
+	}
+	me := b.me
+	td, tl, thp := -1.0, false, 0.0
+	if t := b.tracks[b.targetID]; t != nil {
+		td = hyp(me.Pos[0], me.Pos[1], t.Pos[0], t.Pos[1])
+		tl = t.LOS
+		thp = t.HP
+	}
+	fmt.Fprintf(os.Stderr, "t=%.1f %s hp=%.0f en=%.0f pos=(%.0f,%.0f,%.1f) v=%.1f tgt=%d d=%.0f los=%v thp=%.0f retreat=%v act=%+v\n",
+		b.t, b.mode, me.HP, me.Energy, me.Pos[0], me.Pos[1], me.Pos[2], hyp(me.Vel[0], me.Vel[1], 0, 0), b.targetID, td, tl, thp, b.retreating, act)
+}

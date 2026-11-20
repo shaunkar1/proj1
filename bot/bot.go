@@ -1,0 +1,372 @@
+// Package bot is the mech pilot: perception, aiming, movement and strategy.
+package bot
+
+import (
+	"math"
+	"math/rand"
+
+	"mechbot/geo"
+	"mechbot/proto"
+)
+
+// Params are the tunable knobs (so variants can be compared in the simulator).
+type Params struct {
+	Name          string
+	EngageRatio   float64 // fight when myTTK < ratio * theirTTK
+	RetreatHP     float64 // fraction of max HP below which we break off
+	ReengageHP    float64
+	PrefRangeGun  float64
+	PrefRangeLas  float64
+	PrefRangeLtn  float64
+	JukeMin       float64
+	JukeMax       float64
+	WExpo         float64
+	WAtk          float64
+	WGoal         float64
+	WRange        float64
+	HuntPassive   bool    // seek out enemies when healthy
+	HuntAfter     float64 // start hunting only after this match time
+	FarmNPC       bool
+	UseDrops      bool
+	DropGunForLas bool
+	UpgradePrio   []string
+	WeaponRank    map[string]float64
+	LeadScale     float64
+	Roof          bool
+}
+
+func DefaultParams() Params {
+	return Params{
+		Name: "paw", EngageRatio: 1.0, RetreatHP: 0.35, ReengageHP: 0.8,
+		PrefRangeGun: 95, PrefRangeLas: 130, PrefRangeLtn: 30,
+		JukeMin: 0.35, JukeMax: 0.9, WExpo: 1.0, WAtk: 1.0, WGoal: 1.0, WRange: 1.2,
+		HuntPassive: true, HuntAfter: 20, FarmNPC: true, UseDrops: true,
+		UpgradePrio: []string{"plating", "armor", "nanites", "lightning_efficiency", "gun_damage", "gun_rate", "laser_damage", "laser_charge",
+			"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
+			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
+		WeaponRank: map[string]float64{"lightning": 3, "laser": 2, "mortar": 1, "gun": 0.5},
+		LeadScale:  1.0,
+	}
+}
+
+type Track struct {
+	ID       int
+	NPC      bool
+	Pos, Vel [3]float64
+	PrevVel  [3]float64
+	Aim      [2]float64
+	HP       float64
+	MaxHP    float64
+	Cubes    float64
+	Weapons  []string
+	Charging bool
+	Seen     float64 // last time present in obs
+	First    float64
+	LOS      bool    // I can shoot it right now
+	HitMe    float64 // last time it damaged me
+	DmgToMe  float64 // decayed damage it has done to me
+	IHit     float64 // last time I damaged it
+	AvgVel   [2]float64
+	Scale    float64
+	has      [4]bool // gun mortar laser lightning
+}
+
+func (t *Track) Center() [3]float64 {
+	h := 9.0 * t.Scale
+	if t.NPC {
+		h = 3.5
+	}
+	return [3]float64{t.Pos[0], t.Pos[1], t.Pos[2] + h/2}
+}
+func (t *Track) Top() [3]float64 {
+	h := 9.0 * t.Scale
+	if t.NPC {
+		h = 3.5
+	}
+	return [3]float64{t.Pos[0], t.Pos[1], t.Pos[2] + h - 0.3}
+}
+func (t *Track) Radius() float64 {
+	if t.NPC {
+		return 1.8
+	}
+	return 2.5 * t.Scale
+}
+
+type Item struct {
+	ID   int
+	Kind string
+	Pos  [3]float64
+	HP   float64
+	Seen float64
+	Roof bool
+	Bad  float64 // time until which we ignore it (unreachable)
+}
+
+type Bot struct {
+	P    Params
+	w    *geo.World
+	cfg  proto.Config
+	slot int
+	rng  *rand.Rand
+
+	o   *proto.Obs
+	me  *proto.SelfObs
+	t   float64
+	eye [3]float64
+	muz [3]float64
+
+	tracks  map[int]*Track
+	pickups map[int]*Item
+	crates  map[int]*Item
+	cubes   map[int]*Item
+
+	// nav
+	path     [][2]float64
+	pathGoal [2]float64
+	pathT    float64
+	pathOK   bool
+	pathCost float64
+
+	// movement state
+	strafeSign float64
+	strafeT    float64
+	lastMove   [2]float64
+	stuckT     float64
+	unstickT   float64
+	unstickDir [2]float64
+	lastPos    [3]float64
+	wantMove   bool
+
+	// combat state
+	targetID   int
+	retreating bool
+	lastDmgT   float64 // last time I took weapon damage
+	lastDmgBy  int
+	lastDmgDir float64
+	dmgRecent  float64 // decayed incoming dps estimate
+	scanPhase  float64
+	lasHold    bool
+	cmdAim     [2]float64
+	kills      int
+	othersDied int
+	prevAlive  int
+	mode       string
+	goalKind   string
+	takeTryT   float64
+	hearT      float64
+	hearDir    float64
+	safeSpot   [2]float64
+	safeT      float64
+	roamGoal   [2]float64
+	roamT      float64
+	blockedC   map[int]float64
+	dbg        string
+}
+
+func New(h *proto.Hello, w *geo.World, p Params) *Bot {
+	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
+	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot)))
+	b.tracks = map[int]*Track{}
+	b.pickups = map[int]*Item{}
+	b.crates = map[int]*Item{}
+	b.cubes = map[int]*Item{}
+	b.blockedC = map[int]float64{}
+	b.strafeSign = 1
+	b.targetID = -1
+	b.lastDmgBy = -1
+	b.lastDmgT = -100
+	b.prevAlive = int(h.Config.Match.Mechs)
+	if b.prevAlive == 0 {
+		b.prevAlive = 16
+	}
+	return b
+}
+
+func (b *Bot) Name() string { return b.P.Name }
+
+func (b *Bot) weapon(kind string) (*proto.WeaponObs, int) {
+	for i, w := range b.me.Weapons {
+		if w != nil && w.Kind == kind {
+			return w, i
+		}
+	}
+	return nil, -1
+}
+
+func (b *Bot) dmgMul() float64 {
+	c := math.Min(b.me.Cubes, b.cfg.Cubes.StatCap)
+	return 1 + b.cfg.Cubes.DamagePerCube*c
+}
+
+func (b *Bot) perceive(o *proto.Obs) {
+	b.o = o
+	b.me = &o.Self
+	b.t = o.T
+	me := b.me
+	b.eye = [3]float64{me.Pos[0], me.Pos[1], me.Pos[2] + me.Stats.EyeHeight}
+	b.muz = [3]float64{me.Pos[0], me.Pos[1], me.Pos[2] + me.Stats.MuzzleHeight}
+	for _, t := range b.tracks {
+		t.LOS = false
+	}
+	for i := range o.Mechs {
+		a := &o.Mechs[i]
+		t := b.tracks[a.ID]
+		if t == nil {
+			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, Scale: 1}
+			b.tracks[a.ID] = t
+		}
+		t.PrevVel = t.Vel
+		t.Pos, t.Vel, t.Aim = a.Pos, a.Vel, a.Aim
+		t.HP, t.MaxHP, t.Cubes, t.Weapons, t.Charging = a.HP, a.MaxHP, a.Cubes, a.Weapons, a.Charging
+		t.AvgVel[0] = 0.85*t.AvgVel[0] + 0.15*a.Vel[0]
+		t.AvgVel[1] = 0.85*t.AvgVel[1] + 0.15*a.Vel[1]
+		t.Seen = o.T
+		if !t.NPC {
+			t.Scale = 1 + b.cfg.Cubes.SizePerCube*a.Cubes
+			t.has = [4]bool{}
+			for _, w := range a.Weapons {
+				switch w {
+				case "gun":
+					t.has[0] = true
+				case "mortar":
+					t.has[1] = true
+				case "laser":
+					t.has[2] = true
+				case "lightning":
+					t.has[3] = true
+				}
+			}
+		}
+		c := t.Center()
+		tp := t.Top()
+		t.LOS = b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0], c[1], c[2]) || b.w.Clear(b.muz[0], b.muz[1], b.muz[2], tp[0], tp[1], tp[2])
+	}
+	for id, t := range b.tracks {
+		if t.NPC && o.T-t.Seen > 6 {
+			delete(b.tracks, id)
+		} else if o.T-t.Seen > 25 {
+			delete(b.tracks, id)
+		}
+		t.DmgToMe *= 0.97
+	}
+	// items: refresh seen ones; forget ones that should be visible but are not
+	seenP := map[int]bool{}
+	for _, p := range o.Pickups {
+		seenP[p.ID] = true
+		it := b.pickups[p.ID]
+		if it == nil {
+			it = &Item{ID: p.ID}
+			b.pickups[p.ID] = it
+			it.Roof = p.Pos[2] > b.w.Ground(p.Pos[0], p.Pos[1])+2.5
+		}
+		it.Kind, it.Pos, it.Seen = p.Kind, p.Pos, o.T
+	}
+	near := b.cfg.Vision.NearRange + me.Stats.NearRangeBonus - 3
+	for id, it := range b.pickups {
+		if !seenP[id] && hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) < near && b.w.Clear(b.eye[0], b.eye[1], b.eye[2], it.Pos[0], it.Pos[1], it.Pos[2]+0.5) {
+			delete(b.pickups, id)
+		}
+	}
+	seenC := map[int]bool{}
+	for _, c := range o.Crates {
+		seenC[c.ID] = true
+		it := b.crates[c.ID]
+		if it == nil {
+			it = &Item{ID: c.ID}
+			b.crates[c.ID] = it
+			it.Roof = c.Pos[2] > b.w.Ground(c.Pos[0], c.Pos[1])+2.5
+		}
+		it.Pos, it.HP, it.Seen = c.Pos, c.HP, o.T
+	}
+	for id, it := range b.crates {
+		if !seenC[id] && hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) < near && b.w.Clear(b.eye[0], b.eye[1], b.eye[2], it.Pos[0], it.Pos[1], it.Pos[2]+1.2) {
+			delete(b.crates, id)
+		}
+	}
+	seenQ := map[int]bool{}
+	for _, c := range o.Cubes {
+		seenQ[c.ID] = true
+		it := b.cubes[c.ID]
+		if it == nil {
+			it = &Item{ID: c.ID}
+			b.cubes[c.ID] = it
+			it.Roof = c.Pos[2] > b.w.Ground(c.Pos[0], c.Pos[1])+2.5
+		}
+		it.Pos, it.Seen = c.Pos, o.T
+	}
+	for id, it := range b.cubes {
+		if !seenQ[id] && (hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) < near || o.T-it.Seen > 40) {
+			delete(b.cubes, id)
+		}
+	}
+	// events
+	for i := range o.Events {
+		e := &o.Events[i]
+		switch e.Type {
+		case "damaged":
+			if e.Weapon == "zone" {
+				continue
+			}
+			b.lastDmgT = o.T
+			b.dmgRecent += e.Amount
+			if e.Bearing != nil {
+				b.lastDmgDir = *e.Bearing
+			}
+			if e.By != nil {
+				b.lastDmgBy = *e.By
+				if t := b.tracks[*e.By]; t != nil {
+					t.HitMe = o.T
+					t.DmgToMe += e.Amount
+				}
+			}
+		case "hit":
+			if t := b.tracks[e.Target]; t != nil {
+				t.IHit = o.T
+			}
+		case "kill":
+			b.kills++
+			delete(b.tracks, e.Target)
+			if b.targetID == e.Target {
+				b.targetID = -1
+			}
+		}
+	}
+	b.dmgRecent *= 0.9
+	if o.Alive < b.prevAlive {
+		b.prevAlive = o.Alive
+	}
+	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
+	for _, s := range o.Sounds {
+		if s.Dist == "near" && (s.Kind == "step" || s.Kind == "boost" || s.Kind == "jet" || s.Kind == "reload" || s.Kind == "laser_charge" || s.Kind == "lightning" || s.Kind == "gun") {
+			b.hearT = o.T - s.Age
+			b.hearDir = s.Bearing
+		}
+	}
+	for c, until := range b.blockedC {
+		if o.T > until {
+			delete(b.blockedC, c)
+		}
+	}
+}
+
+// Act is the per-decision entry point.
+func (b *Bot) Act(o *proto.Obs) proto.Action {
+	b.perceive(o)
+	act := proto.Action{Tick: o.Tick}
+	act.Aim = b.cmdAim
+	if o.Tick <= 1 && b.cmdAim == ([2]float64{}) {
+		act.Aim = o.Self.Aim
+	}
+	b.decide(&act)
+	if !finite(act.Aim[0]) || !finite(act.Aim[1]) {
+		act.Aim = o.Self.Aim
+	}
+	if !finite(act.Move[0]) || !finite(act.Move[1]) {
+		act.Move = proto.Vec2{}
+	}
+	act.Aim[1] = clamp(act.Aim[1], b.me.Stats.MinPitch, b.me.Stats.MaxPitch)
+	b.cmdAim = act.Aim
+	b.lastPos = o.Self.Pos
+	b.trace(act)
+	return act
+}
