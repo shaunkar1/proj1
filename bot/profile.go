@@ -103,6 +103,8 @@ func ApplyProfile(p *Params, name string) {
 				p.PracDrop = v / 100
 			case m[0] == 'x':
 				p.RngSalt = int(v)
+			case m[0] == 'j':
+				p.MoveJit = int(v)
 			case m[0] == 't':
 				p.PracFarmT = v
 			case m[0] == 'c':
