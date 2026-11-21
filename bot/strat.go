@@ -1500,7 +1500,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.quiet && !b.P.QuietHide {
 			// do the work that does not take us toward anybody
 			for _, t := range b.trackL {
-				if !b.ffaSure && d <= b.P.ShyNear0 {
+				if !b.ffaSure && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
 					break
 				}
 				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
@@ -1512,6 +1512,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 			}
 			wantLas := (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && d <= b.P.ShyLaserD
+			if b.P.ShyWeapon0 && !b.ffaSure && (ob.kind == "weapon" || ob.kind == "roof") {
+				wantLas = true
+			}
 			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas {
 				// ... nor toward anybody heard: on average we walked 66 m toward the mech that
 				// then hit us first, and it had started 200 m away
