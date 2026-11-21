@@ -237,6 +237,10 @@ func Variant(name string) Params {
 		p.BossRatio = 2.0
 	case "b15r13":
 		p.BossRatio = 1.3
+	case "nopile":
+		p.PileBonus = 0
+	case "pile50":
+		p.PileBonus = 50
 	case "sites":
 		p.Sites = true
 	case "sites2":
