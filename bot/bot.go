@@ -98,6 +98,9 @@ type Params struct {
 	BossFarD        float64 // free-for-all: an errand this far from the strongest mech is fine even if it is nearer to it than we are
 	NoBreak         bool    // no walking away from a spot we keep circling
 	QuietCap        float64 // ... but never past this time
+	QuietEngage     float64 // known free-for-all, quiet phase: engage-ratio multiplier (0: off)
+	QuietAdvD       float64 // ... and never walk in from further than this beyond our best range just because that range would favour us (0: off)
+	FFAAdvD         float64 // known free-for-all, any time: same limit on closing distance (0: off)
 	EndgameFFA      int     // known free-for-all: after the first death, with this many mechs or fewer left (more than two), only fight back
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)
@@ -167,7 +170,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietAlive: 6, QuietCap: 300, EndgameFFA: 16, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietAlive: 6, QuietCap: 300, EndgameFFA: 16, QuietAdvD: 50, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }

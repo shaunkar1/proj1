@@ -269,6 +269,24 @@ func Variant(name string) Params {
 		p.NoLegacy = true
 	case "ffa0":
 		p.FFA0 = "always"
+	case "qe1":
+		p.FFA0 = "always"
+		p.QuietAdvD = 50
+	case "qe2":
+		p.FFA0 = "always"
+		p.QuietAdvD = 50
+		p.QuietEngage = 0.7
+	case "qe3":
+		p.FFA0 = "always"
+		p.FFAAdvD = 50
+	case "qe4":
+		p.FFA0 = "always"
+		p.FFAAdvD = 50
+		p.QuietEngage = 0.7
+	case "qe5":
+		p.FFA0 = "always"
+		p.QuietAdvD = 25
+		p.FFAAdvD = 80
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
