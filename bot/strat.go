@@ -1269,7 +1269,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
-			return // repairing: only what is a few steps away and does not interrupt it
+			// repairing: only what is a few steps away and does not interrupt it -
+			// except a weapon while we have none worth the name
+			if !(b.P.RoofBold && (ob.kind == "weapon" || ob.kind == "roof") && d < 70 && !b.holds("laser")) {
+				return
+			}
 		}
 		if bo := b.boss; bo != nil {
 			// nothing is worth walking toward the strongest mech around
@@ -1335,7 +1339,22 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			// on a roof: climb for it when it is reachable and nobody is around
 			h := it.Pos[2] - me.Pos[2]
 			need := h/8.0*me.Stats.JetDrain + 12
-			if !b.P.Roof || enemiesNear || hpFrac < 0.6 || h < 0 || need > me.MaxEnergy*0.9 {
+			blocked := enemiesNear || hpFrac < 0.6
+			if b.P.RoofBold && !b.holds("laser") {
+				// a laser decides matches and many lie on low roofs: only an enemy that is
+				// actually close and looking, or fire we are taking, keeps us on the ground
+				blocked = hpFrac < 0.5 || b.t-b.lastDmgT < 3
+				for _, t := range b.trackL {
+					if t.NPC || t.Ghost || b.t-t.Seen > 3 {
+						continue
+					}
+					if hyp(px, py, t.Pos[0], t.Pos[1]) < 110 && (b.t < t.Hostile || t.LOS) {
+						blocked = true
+						break
+					}
+				}
+			}
+			if !b.P.Roof || blocked || h < 0 || need > me.MaxEnergy*0.9 {
 				continue
 			}
 			c := b.w.Nav.Nearest(it.Pos[0], it.Pos[1], 30)

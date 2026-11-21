@@ -183,6 +183,8 @@ func Variant(name string) Params {
 		p.BossHot = 1.2
 	case "hot15":
 		p.BossHot = 1.5
+	case "noroofbold":
+		p.RoofBold = false
 	case "sites":
 		p.Sites = true
 	case "sites2":
