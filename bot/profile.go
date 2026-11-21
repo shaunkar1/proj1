@@ -27,6 +27,14 @@ func ApplyProfile(p *Params, name string) {
 			}
 			v, _ := strconv.ParseFloat(m[1:], 64)
 			switch {
+			case m == "pk":
+				p.PracNoPeek = false
+			case m == "ff":
+				p.PracNearFarm = false
+			case m == "bz":
+				p.PracBerserk = true
+			case m == "ll":
+				p.PracLasLtn = true
 			case m == "g":
 				p.GrabAlways = true
 			case m == "s":
