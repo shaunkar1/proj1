@@ -964,23 +964,47 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		b.dithPrev = [2]float64{px, py}
 		if !b.P.NoBreak && b.t-b.dithT > 14 && b.dithPath > 45 && b.t >= b.breakT {
+			if hyp(px, py, b.breakC[0], b.breakC[1]) > 45 {
+				b.breakTried = b.breakTried[:0]
+			}
+			b.breakC = [2]float64{px, py}
 			best, bd := [2]float64{zEnd.c[0], zEnd.c[1]}, math.Inf(1)
 			nv := b.w.Nav
-			for k := 0; k < 12; k++ {
-				a := float64(k) * math.Pi / 6
-				x, y := px+90*math.Cos(a), py+90*math.Sin(a)
-				if !nv.WalkableMain(x, y) || zEnd.outside(x, y) > -15 {
-					continue
+			for pass := 0; pass < 2 && math.IsInf(bd, 1); pass++ {
+				for k := 0; k < 12; k++ {
+					a := float64(k) * math.Pi / 6
+					x, y := px+90*math.Cos(a), py+90*math.Sin(a)
+					if !nv.WalkableMain(x, y) || zEnd.outside(x, y) > -15 {
+						continue
+					}
+					tried := false
+					for _, ta := range b.breakTried {
+						if math.Abs(angDiff(a, ta)) < 1.0 {
+							tried = true // that way did not get us out
+						}
+					}
+					if tried && pass == 0 {
+						continue
+					}
+					c := hyp(x, y, zEnd.c[0], zEnd.c[1])
+					if bo := b.boss; bo != nil && hyp(x, y, bo.Pos[0], bo.Pos[1]) < 120 {
+						c += 300
+					}
+					if c < bd {
+						bd, best = c, [2]float64{x, y}
+					}
 				}
-				c := hyp(x, y, zEnd.c[0], zEnd.c[1])
-				if bo := b.boss; bo != nil && hyp(x, y, bo.Pos[0], bo.Pos[1]) < 120 {
-					c += 300
-				}
-				if c < bd {
-					bd, best = c, [2]float64{x, y}
+				if pass == 0 && math.IsInf(bd, 1) {
+					b.breakTried = b.breakTried[:0]
 				}
 			}
 			b.breakG, b.breakT = best, b.t+9
+			if d := hyp(best[0], best[1], px, py); d > 1 {
+				// whatever holds us here is not on the map: start with a jet hop over it
+				b.breakTried = append(b.breakTried, math.Atan2(best[1]-py, best[0]-px))
+				b.unstickDir = [2]float64{(best[0] - px) / d, (best[1] - py) / d}
+				b.unstickT = b.t + 1.3
+			}
 			b.dithT = 0
 			for _, it := range b.crateL {
 				if hyp(it.Pos[0], it.Pos[1], px, py) < 45 {

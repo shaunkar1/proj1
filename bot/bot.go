@@ -312,6 +312,8 @@ type Bot struct {
 	dithPrev      [2]float64
 	breakT        float64 // walking out of a spot we kept circling
 	breakG        [2]float64
+	breakC        [2]float64 // where the last break-out started, and the headings already tried from there
+	breakTried    []float64
 	cfgFirst      int // hello differs from the kit's: first section, and how many (see cfgDiff)
 	cfgN          int
 	wallOn        bool // running under the real server: observation arrival times are kept
