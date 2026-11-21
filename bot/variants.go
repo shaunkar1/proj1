@@ -241,6 +241,8 @@ func Variant(name string) Params {
 		p.PileBonus = 0
 	case "pile50":
 		p.PileBonus = 50
+	case "nolegacy":
+		p.NoLegacy = true
 	case "sites":
 		p.Sites = true
 	case "sites2":

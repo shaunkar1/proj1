@@ -75,6 +75,7 @@ type Params struct {
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
+	NoLegacy        bool     // test: apply the current settings from the first tick in every match
 	PileBonus       float64  // extra objective value per other cube lying next to a cube (up to six)
 	BossObjD        float64  // objectives this close to a much stronger mech are left alone
 	BossAvoidD      float64  // hide from a much stronger mech inside this distance even without a line of sight
@@ -284,6 +285,8 @@ type Bot struct {
 	farTry        float64
 	periZ         float64
 	boss          *Track
+	E             effP
+	ffaSure       bool // another mech died early: this is a free-for-all
 	seed          int64
 	peer          *Track
 	sawOtherDeath bool
@@ -617,6 +620,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
 	if b.othersDied > 0 {
 		b.sawOtherDeath = true
+		if o.T < 40 {
+			b.ffaSure = true
+		}
 	}
 	// practice = everyone else is one squad: nobody dies unless we kill them
 	b.practice = !b.sawOtherDeath && o.T > 20
@@ -711,4 +717,10 @@ func (b *Bot) probeStop() bool {
 		return true
 	}
 	return false
+}
+
+// effP are the settings in force this tick (see decide).
+type effP struct {
+	BossRatio, HardRatio, BossObjD, BossAvoidD, BossSeenD, PileBonus float64
+	ExploreOld                                                       bool
 }

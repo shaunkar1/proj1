@@ -348,11 +348,18 @@ func (b *Bot) decide(act *proto.Action) {
 
 	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
 	// ---- someone far stronger than us nearby: keep out of its sight
+	// squad matches (and any match until another mech's death shows it is a
+	// free-for-all) run on the settings the scored practice build used, so that
+	// later free-for-all changes cannot move the practice score
+	b.E = effP{b.P.BossRatio, b.P.HardRatio, b.P.BossObjD, b.P.BossAvoidD, b.P.BossSeenD, b.P.PileBonus, b.P.ExploreOld}
+	if !b.ffaSure && !b.P.NoLegacy {
+		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true}
+	}
 	b.boss = nil
 	b.peer = nil
 	bossD := 1e9
 	peerD := 1e9
-	if b.P.BossRatio > 0 && !b.practice && o.Alive > 2 {
+	if b.E.BossRatio > 0 && !b.practice && o.Alive > 2 {
 		for _, t := range b.trackL {
 			if t.NPC || t.Ghost || b.t-t.Seen > 15 {
 				continue
@@ -360,13 +367,13 @@ func (b *Bot) decide(act *proto.Action) {
 			d := hyp(px, py, t.Pos[0], t.Pos[1])
 			if d < 300 {
 				dr := b.dangerRatio(t)
-				if dr <= b.P.BossRatio {
+				if dr <= b.E.BossRatio {
 					continue
 				}
 				if b.P.BossHot > 0 && dr < b.P.BossHot && b.t-t.HitMe < 4 {
 					continue // it is already on us and not much stronger: an answered fight beats a walk to cover
 				}
-				if b.P.HardRatio > 0 && dr <= b.P.HardRatio {
+				if b.E.HardRatio > 0 && dr <= b.E.HardRatio {
 					// about our strength: give it room, but it does not empty the neighbourhood
 					if d < peerD {
 						b.peer, peerD = t, d
@@ -567,7 +574,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
-	case boss != nil && (bossD < b.P.BossAvoidD || (boss.LOS && b.t-boss.Seen < 1.5 && bossD < b.P.BossSeenD)) && !(tgt == boss && finishing):
+	case boss != nil && (bossD < b.E.BossAvoidD || (boss.LOS && b.t-boss.Seen < 1.5 && bossD < b.E.BossSeenD)) && !(tgt == boss && finishing):
 		// outclassed: break its line and open the distance; shoot only if it costs nothing
 		mode = "avoid"
 		sp := b.findSafe(threats)
@@ -1310,7 +1317,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if bo := b.boss; bo != nil {
 			// nothing is worth walking toward the strongest mech around
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
-			if db < b.P.BossObjD || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
+			if db < b.E.BossObjD || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
 				return
 			}
 		}
@@ -1348,7 +1355,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			continue
 		}
 		v := 110.0
-		if b.P.PileBonus > 0 {
+		if b.E.PileBonus > 0 {
 			// a dead mech leaves a heap: the heap is the prize, not the nearest cube of it
 			n := 0
 			for _, o := range b.cubeL {
@@ -1356,7 +1363,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 					n++
 				}
 			}
-			v += b.P.PileBonus * math.Min(float64(n), 6)
+			v += b.E.PileBonus * math.Min(float64(n), 6)
 		}
 		consider(objective{kind: "cube", pos: it.Pos, value: v, item: it})
 	}
@@ -1463,7 +1470,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
-	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !b.practice && (b.P.ExploreOld && !enemiesNear && b.t > 20 || !b.P.ExploreOld && !b.dangerClose()) {
+	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !b.practice && (b.E.ExploreOld && !enemiesNear && b.t > 20 || !b.E.ExploreOld && !b.dangerClose()) {
 		// no laser yet: looking over unseen ground competes with farming
 		if g, ok := b.unseenGoal(zEnd); ok {
 			v := 100.0
