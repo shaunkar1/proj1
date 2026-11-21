@@ -182,6 +182,13 @@ func (s *Sim) hurt(m *Mech, amount float64, weapon string, by int, byNPC bool, f
 	m.HP -= amount
 	m.DmgTaken += amount
 	m.lastDmg = s.T
+	{
+		by2 := by
+		if byNPC {
+			by2 = 100
+		}
+		m.DmgLog = append(m.DmgLog, DmgRec{s.T, by2, weapon, amount, hyp(from[0], from[1], m.Pos[0], m.Pos[1])})
+	}
 	ev := proto.Event{Type: "damaged", Amount: amount, Weapon: weapon, Bearing: fltp(bearing), Rear: rear}
 	if !byNPC {
 		ev.By = intp(by)
@@ -378,6 +385,7 @@ func (s *Sim) fireWeapons(m *Mech) {
 					s.sound("reload", m.Pos[0], m.Pos[1], m.ID)
 				}
 				s.sound("gun", m.Pos[0], m.Pos[1], m.ID)
+				m.Shots++
 				o, _, ok := s.muzzle(m, m.Stats.MuzzleHeight*sc)
 				if !ok {
 					continue
@@ -931,6 +939,7 @@ func (s *Sim) stepProjs() {
 						s.hurt(s.Mechs[tg.idx], p.Damage, "npc", p.Owner, true, from, "")
 					} else {
 						s.hurt(s.Mechs[tg.idx], p.Damage, "gun", p.Owner, false, from, "")
+						s.Mechs[p.Owner].Hits++
 					}
 				case 1:
 					s.hurtNPC(s.NPCs[tg.idx], p.Damage, "gun", p.Owner)

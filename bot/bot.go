@@ -24,6 +24,7 @@ type Params struct {
 	WAtk          float64
 	WGoal         float64
 	WRange        float64
+	Aggressive    bool    // attack any mech on sight
 	HuntPassive   bool    // seek out enemies when healthy
 	HuntAfter     float64 // start hunting only after this match time
 	FarmNPC       bool
@@ -33,18 +34,22 @@ type Params struct {
 	WeaponRank    map[string]float64
 	LeadScale     float64
 	Roof          bool
+	NoDodge       bool
+	NoAdapt       bool
+	Still         bool // test: never move
+	NoFire        bool // test: never shoot
 }
 
 func DefaultParams() Params {
 	return Params{
 		Name: "paw", EngageRatio: 1.0, RetreatHP: 0.35, ReengageHP: 0.8,
-		PrefRangeGun: 95, PrefRangeLas: 130, PrefRangeLtn: 30,
+		PrefRangeGun: 130, PrefRangeLas: 140, PrefRangeLtn: 30,
 		JukeMin: 0.35, JukeMax: 0.9, WExpo: 1.0, WAtk: 1.0, WGoal: 1.0, WRange: 1.2,
 		HuntPassive: true, HuntAfter: 20, FarmNPC: true, UseDrops: true,
 		UpgradePrio: []string{"plating", "armor", "nanites", "lightning_efficiency", "gun_damage", "gun_rate", "laser_damage", "laser_charge",
 			"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
-		WeaponRank: map[string]float64{"lightning": 3, "laser": 2, "mortar": 1, "gun": 0.5},
+		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
 		LeadScale:  1.0,
 	}
 }
@@ -68,6 +73,14 @@ type Track struct {
 	IHit     float64 // last time I damaged it
 	AvgVel   [2]float64
 	Scale    float64
+	hist     [16]histRec // ring of recent states (10 Hz)
+	hn       int
+	pred     int // which predictor currently fits this target best
+	predHit  [nPred]float64
+	shots    float64 // my gun shots at it (decayed)
+	hits     float64 // my gun hits on it (decayed)
+	Hostile  float64 // considered hostile until this time
+	aimedAt  float64 // accumulated seconds spent aiming at us
 	has      [4]bool // gun mortar laser lightning
 }
 
@@ -91,6 +104,13 @@ func (t *Track) Radius() float64 {
 	}
 	return 2.5 * t.Scale
 }
+
+type histRec struct {
+	t        float64
+	pos, vel [3]float64
+}
+
+const nPred = 5
 
 type Item struct {
 	ID   int
@@ -220,7 +240,15 @@ func (b *Bot) perceive(o *proto.Obs) {
 		t.HP, t.MaxHP, t.Cubes, t.Weapons, t.Charging = a.HP, a.MaxHP, a.Cubes, a.Weapons, a.Charging
 		t.AvgVel[0] = 0.85*t.AvgVel[0] + 0.15*a.Vel[0]
 		t.AvgVel[1] = 0.85*t.AvgVel[1] + 0.15*a.Vel[1]
+		if o.T-t.Seen > 0.25 {
+			t.hn = 0 // gap in the data: restart the history
+		}
+		t.hist[t.hn%len(t.hist)] = histRec{o.T, a.Pos, a.Vel}
+		t.hn++
 		t.Seen = o.T
+		if !t.NPC {
+			b.scorePredictors(t)
+		}
 		if !t.NPC {
 			t.Scale = 1 + b.cfg.Cubes.SizePerCube*a.Cubes
 			t.has = [4]bool{}
@@ -240,6 +268,26 @@ func (b *Bot) perceive(o *proto.Obs) {
 		c := t.Center()
 		tp := t.Top()
 		t.LOS = b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0], c[1], c[2]) || b.w.Clear(b.muz[0], b.muz[1], b.muz[2], tp[0], tp[1], tp[2])
+		if !t.NPC {
+			d := hyp(a.Pos[0], a.Pos[1], me.Pos[0], me.Pos[1])
+			brg := math.Atan2(me.Pos[1]-a.Pos[1], me.Pos[0]-a.Pos[0])
+			off := math.Abs(angDiff(a.Aim[0], brg))
+			tol := math.Max(0.12, math.Atan2(6, d))
+			if t.LOS && off < tol && d < 260 {
+				t.aimedAt += 0.1
+				if a.Charging {
+					t.aimedAt += 0.3
+				}
+			} else {
+				t.aimedAt = math.Max(0, t.aimedAt-0.05)
+			}
+			if t.aimedAt >= 0.6 {
+				t.Hostile = math.Max(t.Hostile, o.T+8)
+			}
+			if d < 30 && t.LOS {
+				t.Hostile = math.Max(t.Hostile, o.T+4)
+			}
+		}
 	}
 	for id, t := range b.tracks {
 		if t.NPC && o.T-t.Seen > 6 {
@@ -317,11 +365,15 @@ func (b *Bot) perceive(o *proto.Obs) {
 				if t := b.tracks[*e.By]; t != nil {
 					t.HitMe = o.T
 					t.DmgToMe += e.Amount
+					t.Hostile = math.Max(t.Hostile, o.T+25)
 				}
 			}
 		case "hit":
 			if t := b.tracks[e.Target]; t != nil {
 				t.IHit = o.T
+				if e.Weapon == "gun" {
+					t.hits++
+				}
 			}
 		case "kill":
 			b.kills++
@@ -358,6 +410,13 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		act.Aim = o.Self.Aim
 	}
 	b.decide(&act)
+	if b.P.Still {
+		act.Move = proto.Vec2{}
+		act.Jump = false
+	}
+	if b.P.NoFire {
+		act.Fire = [2]bool{}
+	}
 	if !finite(act.Aim[0]) || !finite(act.Aim[1]) {
 		act.Aim = o.Self.Aim
 	}

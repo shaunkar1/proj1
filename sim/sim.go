@@ -65,6 +65,17 @@ type Mech struct {
 	DmgDealt float64
 	DmgTaken float64
 	ZoneDmg  float64
+	DmgLog   []DmgRec
+	Shots    int
+	Hits     int
+}
+
+type DmgRec struct {
+	T      float64
+	By     int
+	Weapon string
+	Amount float64
+	Dist   float64
 }
 
 func (m *Mech) Scale(cfg *proto.Config) float64 {

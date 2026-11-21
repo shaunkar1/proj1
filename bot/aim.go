@@ -8,12 +8,112 @@ import (
 
 const latency = 0.06 // s between observing and the shot leaving
 
+// histAt returns the i-th most recent history record (0 = newest).
+func (t *Track) histAt(i int) *histRec {
+	n := len(t.hist)
+	return &t.hist[((t.hn-1-i)%n+n)%n]
+}
+
+// predVel is predictor k's velocity estimate using history up to `back`
+// samples ago (0 = now).
+func (t *Track) predVel(k, back int) (float64, float64) {
+	cur := t.histAt(back)
+	avg := func(span int) (float64, float64) {
+		avail := t.hn - back - 1
+		if avail > len(t.hist)-1-back {
+			avail = len(t.hist) - 1 - back
+		}
+		if span > avail {
+			span = avail
+		}
+		if span < 1 {
+			return cur.vel[0], cur.vel[1]
+		}
+		old := t.histAt(back + span)
+		dt := cur.t - old.t
+		if dt < 0.05 {
+			return cur.vel[0], cur.vel[1]
+		}
+		return (cur.pos[0] - old.pos[0]) / dt, (cur.pos[1] - old.pos[1]) / dt
+	}
+	switch k {
+	case 1:
+		return avg(5)
+	case 2:
+		return avg(10)
+	case 3:
+		return 0, 0
+	case 4:
+		return cur.vel[0] * 0.5, cur.vel[1] * 0.5
+	}
+	return cur.vel[0], cur.vel[1]
+}
+
+// scorePredictors replays the last second: which way of extrapolating this
+// mech would have put a round on it most often at the current flight time?
+func (b *Bot) scorePredictors(t *Track) {
+	n := t.hn
+	if n > len(t.hist) {
+		n = len(t.hist)
+	}
+	d := hyp(t.Pos[0], t.Pos[1], b.me.Pos[0], b.me.Pos[1])
+	speed := 252.0
+	if g, _ := b.weapon("gun"); g != nil {
+		speed = g.Stats.Speed
+	}
+	h := int(math.Round(d/speed/0.1 + 0.5)) // flight time in samples
+	if h < 1 {
+		h = 1
+	}
+	if h > 6 {
+		h = 6
+	}
+	if n < h+3 {
+		return
+	}
+	rad := t.Radius() * 0.85
+	var hit [nPred]float64
+	cnt := 0.0
+	for back := h; back < n-1 && back < h+9; back++ {
+		at := t.histAt(back)
+		act := t.histAt(back - h)
+		dt := act.t - at.t
+		cnt++
+		for k := 0; k < nPred; k++ {
+			vx, vy := t.predVel(k, back)
+			ex, ey := at.pos[0]+vx*dt-act.pos[0], at.pos[1]+vy*dt-act.pos[1]
+			if e := math.Hypot(ex, ey); e < rad {
+				hit[k] += 1
+			} else if e < rad*1.6 {
+				hit[k] += 0.3
+			}
+		}
+	}
+	if cnt < 3 {
+		return
+	}
+	best := t.pred
+	for k := 0; k < nPred; k++ {
+		t.predHit[k] = 0.7*t.predHit[k] + 0.3*hit[k]/cnt
+	}
+	for k := 0; k < nPred; k++ {
+		if t.predHit[k] > t.predHit[best]+0.08 {
+			best = k
+		}
+	}
+	t.pred = best
+}
+
 // predict returns the target's centre after dt seconds.
 func (b *Bot) predict(t *Track, dt float64) [3]float64 {
 	c := t.Center()
 	ls := b.P.LeadScale
-	x := c[0] + t.Vel[0]*dt*ls
-	y := c[1] + t.Vel[1]*dt*ls
+	vx, vy := t.Vel[0], t.Vel[1]
+	if !t.NPC && t.hn > 3 && !b.P.NoAdapt {
+		vx, vy = t.predVel(t.pred, 0)
+	}
+	x := c[0] + vx*dt*ls
+	y := c[1] + vy*dt*ls
 	z := c[2]
 	if math.Abs(t.Vel[2]) > 0.5 {
 		// airborne: ballistic, but never below the ground
@@ -138,6 +238,9 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 			if clear && gun.Reload <= 0 && gun.Ammo > 0 && ey < tolY && ep < tolP && d < gun.Stats.Range {
 				act.Fire[gi] = true
 				shot = true
+				if gun.Cooldown <= 0.1 {
+					t.shots += 0.1 / gun.Stats.Cooldown // expected rounds this decision
+				}
 			}
 			if clear {
 				shot = true

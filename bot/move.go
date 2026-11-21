@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"fmt"
 	"math"
+	"os"
 
 	"mechbot/geo"
 )
@@ -15,16 +17,17 @@ type threat struct {
 }
 
 type moveCtx struct {
-	goal    *[2]float64 // nav goal (nil = hold area)
-	threats []threat
-	target  *Track
-	wantLOS float64 // + seek line of fire to target, - avoid
-	pref    float64 // preferred range to target (0 = none)
-	strafe  bool
-	hide    bool // avoid all sight lines
-	boost   bool
-	wGoal   float64
-	arrive  float64 // stop within this distance of the goal
+	goal     *[2]float64 // nav goal (nil = hold area)
+	threats  []threat
+	target   *Track
+	wantLOS  float64 // + seek line of fire to target, - avoid
+	pref     float64 // preferred range to target (0 = none)
+	strafe   bool
+	hide     bool // avoid all sight lines
+	boost    bool
+	wGoal    float64
+	arrive   float64 // stop within this distance of the goal
+	mustMove bool    // standing still is not an option (zone)
 }
 
 type zoneC struct {
@@ -179,8 +182,8 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 
 	// incoming projectiles
 	var incs []inc
-	var dodgeDone [17]bool
 	var dodgePen [17]float64
+	haveDodge := false
 	for i := range b.o.Projectiles {
 		p := &b.o.Projectiles[i]
 		rx, ry := px-p.Pos[0], py-p.Pos[1]
@@ -224,25 +227,38 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		incs = append(incs, inc{p: p.Pos, v: p.Vel})
 	}
 
-	type cand struct{ dx, dy, r float64 }
+	if len(incs) > 0 && !b.P.NoDodge {
+		dodgePen = b.dodgePlan(incs, speed)
+		haveDodge = true
+	}
+	if Debug && b.P.NoFire {
+		fmt.Fprintf(os.Stderr, "t=%.2f pos=(%.1f,%.1f) vel=(%.1f,%.1f) nproj=%d incs=%d pen=%.0f\n", b.t, px, py, me.Vel[0], me.Vel[1], len(b.o.Projectiles), len(incs), dodgePen)
+		for _, p := range b.o.Projectiles {
+			fmt.Fprintf(os.Stderr, "    proj %d pos=(%.1f,%.1f,%.1f) vel=(%.1f,%.1f,%.1f)\n", p.ID, p.Pos[0], p.Pos[1], p.Pos[2], p.Vel[0], p.Vel[1], p.Vel[2])
+		}
+	}
+	type cand struct {
+		dx, dy, r float64
+		free      bool // the path's own next step: not subject to the straight-line check
+	}
 	cands := make([]cand, 0, 40)
-	cands = append(cands, cand{0, 0, 0})
+	cands = append(cands, cand{0, 0, 0, false})
 	for k := 0; k < 16; k++ {
 		a := float64(k) * math.Pi / 8
-		cands = append(cands, cand{math.Cos(a), math.Sin(a), 5}, cand{math.Cos(a), math.Sin(a), 11})
+		cands = append(cands, cand{math.Cos(a), math.Sin(a), 2.5, false}, cand{math.Cos(a), math.Sin(a), 5, false}, cand{math.Cos(a), math.Sin(a), 11, false})
 	}
 	if hasCarrot {
 		d := hyp(carrot[0], carrot[1], px, py)
 		if d > 0.5 {
-			cands = append(cands, cand{(carrot[0] - px) / d, (carrot[1] - py) / d, math.Min(d, 11)})
+			cands = append(cands, cand{(carrot[0] - px) / d, (carrot[1] - py) / d, math.Min(d, 11), true})
 		}
 	}
 	bestS := math.Inf(-1)
 	var bx, by float64
-	splash := 9.0
+	_ = 9.0
 	for _, c := range cands {
 		x, y := px+c.dx*c.r, py+c.dy*c.r
-		if c.r > 0 {
+		if c.r > 0 && !c.free {
 			if onNav {
 				if !nv.WalkLine(px, py, x, y) {
 					continue
@@ -250,6 +266,9 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			} else if !b.w.InBounds(x, y) {
 				continue
 			}
+		}
+		if c.r == 0 && ctx.mustMove {
+			continue
 		}
 		s := 0.0
 		gz := b.w.Ground(x, y)
@@ -292,8 +311,12 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				}
 			}
 			// never let lightning carriers close in for free
-			if th.t.has[3] && d < 52 && th.weight > 0.3 {
-				s -= (52 - d) * 6
+			if th.t.has[3] && d < 54 && !(th.isTgt && ctx.pref > 0 && ctx.pref < 50) {
+				s -= (54 - d) * 7
+			}
+			// keep clear of anyone we are not deliberately fighting up close
+			if !th.t.NPC && !(th.isTgt && ctx.pref < 60) && d < 60 {
+				s -= (60 - d) * 1.5
 			}
 			if d < 7 {
 				s -= (7 - d) * 10
@@ -306,26 +329,18 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		if ctx.strafe && c.r > 0 {
 			s += 5.0 * (c.dx*sdx + c.dy*sdy) * c.r / 5
 		}
-		// dodge: follow our own accel-limited motion against each incoming round
-		if len(incs) > 0 {
+		// dodge: best achievable outcome if we start in this direction
+		if haveDodge {
 			key := 0
 			if c.r > 0 {
-				key = 1 + int(math.Round(math.Atan2(c.dy, c.dx)/(math.Pi/8)+16))%16
-			}
-			if c.r > 0 && math.Abs(math.Atan2(c.dy, c.dx)/(math.Pi/8)-math.Round(math.Atan2(c.dy, c.dx)/(math.Pi/8))) > 0.01 {
-				key = -1
-			}
-			var pen float64
-			if key >= 0 && dodgeDone[key] {
-				pen = dodgePen[key]
-			} else {
-				pen = b.dodgeCost(c.dx*boolf(c.r > 0), c.dy*boolf(c.r > 0), speed, incs, splash)
-				if key >= 0 {
-					dodgeDone[key] = true
-					dodgePen[key] = pen
+				k := math.Atan2(c.dy, c.dx) / (math.Pi / 8)
+				kr := math.Round(k)
+				key = 1 + (int(kr)+32)%16
+				if math.Abs(k-kr) > 0.01 {
+					// off-grid direction (the carrot): use the nearest sampled one
 				}
 			}
-			s -= pen
+			s -= dodgePen[key]
 		}
 		// inertia
 		if c.r > 0 {
@@ -359,81 +374,163 @@ type inc struct {
 	it     float64
 }
 
-// dodgeCost simulates moving in direction (ux,uy) for the next second and
-// returns a penalty for every incoming round that would connect.
-func (b *Bot) dodgeCost(ux, uy, speed float64, incs []inc, splash float64) float64 {
+const dodgeSteps = 20
+
+var dirs16 = func() (d [17][2]float64) {
+	for k := 0; k < 16; k++ {
+		a := float64(k) * math.Pi / 8
+		d[k+1] = [2]float64{math.Cos(a), math.Sin(a)}
+	}
+	return
+}()
+
+// dodgePlan searches short movement sequences (a first direction held for one
+// decision, then two more legs) against every incoming round, and returns for
+// each first direction (0 = stop, 1..16 = compass) the least damage we can
+// still get away with.
+func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 	me := b.me
 	const dt = 0.05
-	const steps = 24
-	var traj [steps + 1][2]float64
-	x, y := me.Pos[0], me.Pos[1]
-	vx, vy := me.Vel[0], me.Vel[1]
 	acc := me.Stats.GroundAccel
 	if !me.Grounded {
 		acc = me.Stats.AirAccel
 	}
-	traj[0] = [2]float64{x, y}
-	for k := 1; k <= steps; k++ {
-		dvx, dvy := ux*speed-vx, uy*speed-vy
+	R := me.Stats.Radius
+	nv := b.w.Nav
+	// round positions per step (segment start), and splash info
+	type rb struct {
+		px, py, vx, vy float64
+		z0, vz         float64
+		mortar         bool
+		ix, iy         float64
+		ik             int
+	}
+	rs := make([]rb, 0, len(incs))
+	for i := range incs {
+		in := &incs[i]
+		r := rb{px: in.p[0], py: in.p[1], vx: in.v[0], vy: in.v[1], z0: in.p[2], vz: in.v[2], mortar: in.mortar, ix: in.ix, iy: in.iy}
+		r.ik = int(in.it/dt + 0.5)
+		rs = append(rs, r)
+	}
+	if len(rs) > 14 {
+		rs = rs[:14]
+	}
+	zLo, zHi := me.Pos[2]-1.0, me.Pos[2]+me.Stats.Height+1.0
+	splash := 10.0
+	// cost of being at (x,y) during step k
+	stepCost := func(k int, x, y float64) float64 {
+		c := 0.0
+		t0 := float64(k) * dt
+		for i := range rs {
+			r := &rs[i]
+			if r.mortar {
+				if k == r.ik || (k == dodgeSteps-1 && r.ik >= dodgeSteps) {
+					d := math.Hypot(x-r.ix, y-r.iy)
+					if d < splash {
+						c += 170 * (1 - d/splash)
+					}
+				}
+				continue
+			}
+			ax, ay := r.px+r.vx*t0, r.py+r.vy*t0
+			sx, sy := r.vx*dt, r.vy*dt
+			l2 := sx*sx + sy*sy
+			u := ((x-ax)*sx + (y-ay)*sy) / l2
+			if u < -0.2 || u > 1.2 {
+				continue
+			}
+			uc := clamp(u, 0, 1)
+			d := math.Hypot(x-(ax+sx*uc), y-(ay+sy*uc))
+			if d > R+1.6 {
+				continue
+			}
+			bz := r.z0 + r.vz*(t0+uc*dt)
+			if bz < zLo || bz > zHi {
+				continue
+			}
+			if d < R+0.45 {
+				c += 100
+			} else {
+				c += 14 * (1 - (d-R-0.45)/1.15)
+			}
+		}
+		return c
+	}
+	type st struct{ x, y, vx, vy float64 }
+	adv := func(s st, ux, uy float64) st {
+		dvx, dvy := ux*speed-s.vx, uy*speed-s.vy
 		dl := math.Hypot(dvx, dvy)
 		if dl > acc*dt {
 			dvx *= acc * dt / dl
 			dvy *= acc * dt / dl
 		}
-		vx += dvx
-		vy += dvy
-		x += vx * dt
-		y += vy * dt
-		traj[k] = [2]float64{x, y}
+		s.vx += dvx
+		s.vy += dvy
+		s.x += s.vx * dt
+		s.y += s.vy * dt
+		return s
 	}
-	need := me.Stats.Radius + 0.9
-	pen := 0.0
-	for i := range incs {
-		in := &incs[i]
-		if in.mortar {
-			k := int(in.it/dt + 0.5)
-			if k > steps {
-				k = steps
-			}
-			d := hyp(traj[k][0], traj[k][1], in.ix, in.iy)
-			if d < splash+3 {
-				pen += 170 * (1 - d/(splash+3))
-			}
-			continue
+	const leg1, leg2 = 2, 5 // steps: one decision, then 0.15 s, then the rest
+	var out [17]float64
+	s0 := st{me.Pos[0], me.Pos[1], me.Vel[0], me.Vel[1]}
+	onNav := nv.Walkable(s0.x, s0.y)
+	for d1 := 0; d1 < 17; d1++ {
+		s1 := s0
+		c1 := 0.0
+		for k := 0; k < leg1; k++ {
+			s1 = adv(s1, dirs16[d1][0], dirs16[d1][1])
+			c1 += stepCost(k, s1.x, s1.y)
 		}
 		best := math.Inf(1)
-		// the round sweeps a segment each step; test against our position then
-		for k := 0; k < steps; k++ {
-			t0 := float64(k)*dt + latency
-			ax, ay := in.p[0]+in.v[0]*t0, in.p[1]+in.v[1]*t0
-			bx, by := ax+in.v[0]*dt, ay+in.v[1]*dt
-			// distance from our point to segment a-b
-			cx, cy := traj[k][0], traj[k][1]
-			sx, sy := bx-ax, by-ay
-			l2 := sx*sx + sy*sy
-			u := 0.0
-			if l2 > 1e-9 {
-				u = clamp(((cx-ax)*sx+(cy-ay)*sy)/l2, 0, 1)
+		for d2 := 0; d2 < 17; d2 += 2 {
+			if d2 > 0 {
+				d2-- // 0, then odd indices 1,3,..15 (8 compass directions)
 			}
-			d := math.Hypot(cx-(ax+sx*u), cy-(ay+sy*u))
-			if d < best {
-				bz := in.p[2] + in.v[2]*(t0+u*dt)
-				if bz > me.Pos[2]-1.5 && bz < me.Pos[2]+me.Stats.Height+1.5 {
-					best = d
+			s2 := s1
+			c2 := c1
+			for k := leg1; k < leg2 && c2 < best; k++ {
+				s2 = adv(s2, dirs16[d2][0], dirs16[d2][1])
+				c2 += stepCost(k, s2.x, s2.y)
+			}
+			if c2 < best {
+				for d3 := 0; d3 < 17; d3 += 2 {
+					if d3 > 0 {
+						d3--
+					}
+					s3 := s2
+					c3 := c2
+					for k := leg2; k < dodgeSteps && c3 < best; k++ {
+						s3 = adv(s3, dirs16[d3][0], dirs16[d3][1])
+						c3 += stepCost(k, s3.x, s3.y)
+					}
+					if c3 < best && onNav && !nv.Walkable(s3.x, s3.y) {
+						c3 += 30
+					}
+					if c3 < best {
+						best = c3
+					}
+					if d3 > 0 {
+						d3++
+					}
 				}
 			}
-			// stop once the round has passed us
-			if (cx-bx)*sx+(cy-by)*sy < -need*math.Sqrt(l2)-20*math.Sqrt(l2) {
-				break
+			if d2 > 0 {
+				d2++
 			}
 		}
-		if best < need {
-			pen += 50 * (1.2 - best/need)
-		} else if best < need+1.5 {
-			pen += 8 * (1 - (best-need)/1.5)
+		out[d1] = best
+	}
+	// only the differences matter
+	mn := math.Inf(1)
+	for _, v := range out {
+		if v < mn {
+			mn = v
 		}
 	}
-	return pen
+	for i := range out {
+		out[i] -= mn
+	}
+	return out
 }
 
 func boolf(v bool) float64 {

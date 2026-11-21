@@ -22,13 +22,14 @@ type Squad struct {
 	Alive    map[int]float64 // last report time
 	Sight    map[int]*Sight
 	LateT    float64
+	Aggro    int // 0: non-hunters never fight; 1: only when hit or crowded; 2: whenever they see the enemy
 	T        float64
 	hunters  map[int]bool
 	huntCalc float64
 }
 
 func NewSquad() *Squad {
-	return &Squad{Members: map[int]int{}, Alive: map[int]float64{}, Sight: map[int]*Sight{}, LateT: 290, hunters: map[int]bool{}, huntCalc: -1}
+	return &Squad{Members: map[int]int{}, Alive: map[int]float64{}, Sight: map[int]*Sight{}, LateT: 290, Aggro: 1, hunters: map[int]bool{}, huntCalc: -1}
 }
 
 func (s *Squad) Report(o *proto.Obs) {
@@ -83,36 +84,37 @@ type Skill struct {
 }
 
 var Levels = []Skill{
-	{AimNoise: 0.06, Lead: 0.3, Strafe: 0.0, Range: 55, Retreat: 0, Smart: false},
-	{AimNoise: 0.035, Lead: 0.7, Strafe: 0.4, Range: 65, Retreat: 0, Smart: false},
+	{AimNoise: 0.10, Lead: 0.0, Strafe: 0.0, Range: 45, Retreat: 0, Smart: false},
+	{AimNoise: 0.05, Lead: 0.6, Strafe: 0.4, Range: 60, Retreat: 0, Smart: false},
 	{AimNoise: 0.018, Lead: 1.0, Strafe: 0.8, Range: 75, Retreat: 0.25, Smart: true},
 	{AimNoise: 0.008, Lead: 1.0, Strafe: 1.0, Range: 80, Retreat: 0.3, Smart: true},
 }
 
 type Bot struct {
-	sq    *Squad
-	sk    Skill
-	lvl   int
-	w     *geo.World
-	cfg   proto.Config
-	rng   *rand.Rand
-	id    int
-	path  [][2]float64
-	pgoal [2]float64
-	pT    float64
-	noise [2]float64
-	noiT  float64
-	sSign float64
-	sT    float64
-	roam  [2]float64
-	roamT float64
-	cmd   [2]float64
-	seenP map[int]proto.PickupObs
-	seenC map[int]proto.ItemObs
-	stuck float64
-	last  [3]float64
-	unT   float64
-	unD   [2]float64
+	sq       *Squad
+	sk       Skill
+	lvl      int
+	w        *geo.World
+	cfg      proto.Config
+	rng      *rand.Rand
+	id       int
+	path     [][2]float64
+	pgoal    [2]float64
+	pT       float64
+	noise    [2]float64
+	noiT     float64
+	sSign    float64
+	sT       float64
+	roam     [2]float64
+	roamT    float64
+	cmd      [2]float64
+	seenP    map[int]proto.PickupObs
+	seenC    map[int]proto.ItemObs
+	stuck    float64
+	last     [3]float64
+	unT      float64
+	unD      [2]float64
+	provoked float64
 }
 
 func New(h *proto.Hello, w *geo.World, sq *Squad, lvl int) *Bot {
@@ -237,7 +239,20 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		hasGoal = true
 		boost = !me.InZone
 	}
-	fight := tgt != nil && (hunter || bd < 110)
+	for i := range o.Events {
+		if e := &o.Events[i]; e.Type == "damaged" && e.By != nil && *e.By < 100 && !isFriend(*e.By) {
+			b.provoked = o.T + 8
+		}
+	}
+	fight := tgt != nil && hunter
+	if tgt != nil && !hunter && b.sq != nil {
+		switch b.sq.Aggro {
+		case 1:
+			fight = o.T < b.provoked || bd < 40
+		case 2:
+			fight = bd < 110 || o.T < b.provoked
+		}
+	}
 	hpF := me.HP / me.MaxHP
 	var mv [2]float64
 	if b.t(o) < b.sT {

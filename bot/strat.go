@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"fmt"
 	"math"
+	"os"
 
 	"mechbot/proto"
 )
@@ -24,7 +26,8 @@ func (b *Bot) enemyDps(t *Track, d float64) float64 {
 	if t.has[0] || !known {
 		g := b.cfg.Weapons["gun"]
 		if d < g.Range {
-			ph := clamp(0.9-(d-35)*0.0055, 0.15, 0.9)
+			// we dodge: their rounds only land when the flight time is short
+			ph := clamp(0.9-(d-40)*0.0125, 0.06, 0.9)
 			dps += 105 * ph
 		}
 	}
@@ -53,8 +56,7 @@ func (b *Bot) myDps(t *Track, d float64) float64 {
 			if d < w.Stats.Range {
 				cyc := w.Stats.Mag*w.Stats.Cooldown + w.Stats.Reload
 				sus := w.Stats.Damage * w.Stats.Mag / cyc
-				ph := clamp(0.95-(d-40)*0.004, 0.3, 0.95)
-				dps += sus * ph
+				dps += sus * b.gunHitProb(t, d)
 			}
 		case "laser":
 			if d < w.Stats.Range {
@@ -78,6 +80,33 @@ func (b *Bot) myDps(t *Track, d float64) float64 {
 		}
 	}
 	return dps * mul
+}
+
+// gunHitProb: chance one of our rounds lands at range d, using what we have
+// measured against this particular target (does it dodge?).
+func (b *Bot) gunHitProb(t *Track, d float64) float64 {
+	base := func(d float64) float64 { return clamp(0.97-(d-40)*0.0035, 0.3, 0.97) }
+	pb := base(d)
+	if t.NPC || t.shots < 6 {
+		return pb
+	}
+	dm := hyp(t.Pos[0], t.Pos[1], b.me.Pos[0], b.me.Pos[1])
+	k := clamp((t.hits/t.shots)/base(dm), 0.05, 1.1)
+	// up close nobody dodges
+	k += (1 - k) * clamp((60-d)/30, 0, 1)
+	return clamp(pb*k, 0.02, 0.97)
+}
+
+// bestRange picks the fighting distance where our damage most outweighs theirs.
+func (b *Bot) bestRange(t *Track) (float64, float64) {
+	bestD, bestA := 130.0, math.Inf(-1)
+	for _, d := range [...]float64{28, 40, 55, 75, 100, 130, 160, 190} {
+		a := b.myDps(t, d) - 1.15*b.enemyDps(t, d)
+		if a > bestA+2 {
+			bestA, bestD = a, d
+		}
+	}
+	return bestD, bestA
 }
 
 func (b *Bot) pickUpgrade(o *proto.Offer) int {
@@ -188,17 +217,14 @@ func (b *Bot) decide(act *proto.Action) {
 			continue
 		}
 		d := hyp(px, py, t.Pos[0], t.Pos[1])
-		w := 0.35
+		w := 0.3
 		bearingToMe := math.Atan2(py-t.Pos[1], px-t.Pos[0])
 		facing := math.Abs(angDiff(t.Aim[0], bearingToMe))
-		if facing < 0.6 {
-			w = 0.8
-		}
-		if b.t-t.HitMe < 5 {
+		hostile := b.t < t.Hostile
+		if hostile {
 			w = 1
-		}
-		if d < 60 {
-			w = math.Max(w, 0.8)
+		} else if d < 60 {
+			w = 0.5
 		}
 		if age > 0.3 {
 			w *= clamp(1-age/12, 0.1, 1)
@@ -207,7 +233,7 @@ func (b *Bot) decide(act *proto.Action) {
 		threats = append(threats, threat{t: t, eye: [3]float64{t.Pos[0], t.Pos[1], t.Pos[2] + eh}, weight: w})
 		if age < 0.3 {
 			mechs = append(mechs, t)
-			if t.LOS && (facing < 0.6 || b.t-t.HitMe < 3) {
+			if t.LOS && hostile && (facing < 0.6 || b.t-t.HitMe < 3) {
 				incoming += b.enemyDps(t, d)
 				nHostile++
 			}
@@ -219,6 +245,9 @@ func (b *Bot) decide(act *proto.Action) {
 	bestV := -1e18
 	for _, t := range mechs {
 		d := hyp(px, py, t.Pos[0], t.Pos[1])
+		if !b.fair(t, d, hpFrac) {
+			continue
+		}
 		v := -t.HP - d*2.5
 		if t.LOS {
 			v += 400
@@ -283,22 +312,33 @@ func (b *Bot) decide(act *proto.Action) {
 	// ---- fight or flight
 	engage := false
 	myTTK, theirTTK := 1e9, 1e9
+	prefD, adv := 0.0, 0.0
 	if tgt != nil {
 		d := hyp(px, py, tgt.Pos[0], tgt.Pos[1])
-		md := b.myDps(tgt, d)
+		prefD, adv = b.bestRange(tgt)
+		// judge the fight at the range we would actually hold
+		dEval := d
+		if math.Abs(d-prefD) < 60 || prefD > d {
+			dEval = prefD
+		}
+		md := b.myDps(tgt, dEval)
 		if md > 0 {
 			myTTK = tgt.HP / md
 		}
-		inc := incoming
-		if inc < 1 {
-			inc = b.enemyDps(tgt, d) * 0.6
+		inc := b.enemyDps(tgt, dEval)
+		// others already shooting at us
+		for _, t := range mechs {
+			if t != tgt && t.LOS && b.t < t.Hostile {
+				inc += b.enemyDps(t, hyp(px, py, t.Pos[0], t.Pos[1]))
+			}
 		}
 		theirTTK = me.HP / math.Max(inc, 1)
-		engage = myTTK < b.P.EngageRatio*theirTTK
+		engage = myTTK < b.P.EngageRatio*theirTTK || adv > 25
 		if nHostile >= 2 && myTTK > 2.5 {
-			engage = engage && myTTK*1.6 < theirTTK
+			engage = engage && myTTK*1.5 < theirTTK
 		}
 	}
+	_ = adv
 	finishing := tgt != nil && myTTK < 1.6
 	if !b.retreating {
 		if hpFrac < b.P.RetreatHP && (incoming > 0 || b.t-b.lastDmgT < 3) && !finishing {
@@ -324,7 +364,8 @@ func (b *Bot) decide(act *proto.Action) {
 		mode = "zone"
 		goal, hasGoal = zoneGoal, true
 		ctx.boost = me.Energy > 8
-		ctx.wGoal = 3
+		ctx.wGoal = 4
+		ctx.mustMove = true
 		if tgt != nil {
 			ctx.target = tgt
 			ctx.strafe = false
@@ -342,7 +383,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.strafe = true
 		ctx.wantLOS = 1
-		ctx.pref = b.prefRange(tgt)
+		ctx.pref = prefD
 		for i := range threats {
 			if threats[i].t == tgt {
 				threats[i].isTgt = true
@@ -354,8 +395,11 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.wGoal = 0.8
 		}
 		d := hyp(px, py, tgt.Pos[0], tgt.Pos[1])
-		if b.holds("lightning") && d > 40 && d < 110 && me.Energy > 45 {
-			ctx.boost = true
+		if prefD < 50 && d > prefD+12 && d < 120 && me.Energy > 45 {
+			ctx.boost = true // close the gap for the short-range weapon
+		}
+		if prefD > d+25 && me.Energy > 30 {
+			ctx.boost = true // open the range back up
 		}
 		if zoneGo {
 			// drift toward the zone while fighting
@@ -368,6 +412,12 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 2
 			ctx.boost = me.Energy > 60 && needIn > 60
+		} else if hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0 {
+			// hurt and unobserved: stay out of sight until repaired
+			mode = "heal"
+			goal, hasGoal = b.findSafe(threats), true
+			ctx.hide = true
+			ctx.arrive = 2
 		} else if ob := b.pickObjective(zEnd, hpFrac, len(mechs) > 0); ob != nil {
 			mode = ob.kind
 			goal, hasGoal = [2]float64{ob.pos[0], ob.pos[1]}, true
@@ -459,6 +509,9 @@ func (b *Bot) decide(act *proto.Action) {
 			continue
 		}
 		d := hyp(px, py, t.Pos[0], t.Pos[1])
+		if !b.fair(t, d, hpFrac) {
+			continue
+		}
 		v := -t.HP*0.6 - d*2
 		if t == tgt {
 			v += 200
@@ -484,7 +537,16 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		shot = true
 	}
-	if !shot && shootT == nil {
+	healing := hpFrac < 0.85 && b.t-b.lastDmgT < 40
+	if !shot && shootT == nil && healing {
+		// keep still on the trigger: dealing damage restarts the repair timer
+		for _, t := range b.tracks {
+			if t.NPC && t.LOS && b.t-t.Seen < 0.3 && b.t-t.HitMe < 2 {
+				shot = b.shootMech(act, t)
+				break
+			}
+		}
+	} else if !shot && shootT == nil {
 		// farm: nearest NPC shooting us or chosen, then crates
 		if farmNPC != nil && farmNPC.LOS {
 			shot = b.shootMech(act, farmNPC)
@@ -532,6 +594,24 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	b.dbg = mode
+	if Debug && b.P.NoFire {
+		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
+	}
+}
+
+// fair reports whether a mech is a legitimate target right now: it is hostile
+// to us, or weak enough to be worth starting a fight over.
+func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
+	if b.t < t.Hostile {
+		return true
+	}
+	if b.P.Aggressive {
+		return true
+	}
+	if t.HP < 0.4*t.MaxHP && hpFrac > 0.6 && d < 150 {
+		return true
+	}
+	return false
 }
 
 // prefRange picks the fighting distance against a target from both loadouts.
@@ -686,7 +766,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool) *objec
 	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter {
 		for _, t := range b.tracks {
-			if t.NPC || b.t-t.Seen > 20 {
+			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive) {
 				continue
 			}
 			consider(objective{kind: "hunt", pos: t.Pos, value: 120 - (b.t-t.Seen)*3, trk: t})

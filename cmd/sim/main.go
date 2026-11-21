@@ -46,6 +46,7 @@ type result struct {
 	cubes              int
 	dealt, taken, zone float64
 	name               string
+	shots, hits        int
 }
 
 func loadHello(path string) *proto.Hello {
@@ -78,6 +79,7 @@ func main() {
 	stream := flag.String("hello", "/home/claude/kit/mechfight-kit/check/stream.jsonl.gz", "recorded stream with a hello")
 	late := flag.Float64("late", 290, "squad all-hunt time")
 	expert := flag.String("expert", "paw", "variant used for expert house bots")
+	aggro := flag.Int("aggro", 1, "non-hunter aggression 0..2")
 	opp := flag.String("opp", "house0", "duel opponent: houseN or a variant")
 	sep := flag.Float64("sep", 130, "duel spawn separation")
 	loot := flag.Bool("loot", false, "duel: keep loot, crates, NPCs")
@@ -106,6 +108,7 @@ func main() {
 				names := map[int]string{}
 				sq := house.NewSquad()
 				sq.LateT = *late
+				sq.Aggro = *aggro
 				mySlot := int(sd*7) % 16
 				hello := *base
 				if *mode == "duel" {
@@ -125,7 +128,11 @@ func main() {
 					if *mode == "duel" {
 						if slot == mySlot {
 							v := cands[0]
-							t := &timed{inner: bot.New(h, w, bot.Variant(v))}
+							var inner sim.Controller = bot.New(h, w, bot.Variant(v))
+							if v == "starter" {
+								inner = &house.Starter{Reach: h.Config.Loot.PickupRadius}
+							}
+							t := &timed{inner: inner}
 							tm = append(tm, t)
 							names[slot] = v
 							return t, v
@@ -140,7 +147,11 @@ func main() {
 					if *mode == "practice" {
 						if slot == mySlot {
 							v := cands[int(sd)%len(cands)]
-							t := &timed{inner: bot.New(h, w, bot.Variant(v))}
+							var inner sim.Controller = bot.New(h, w, bot.Variant(v))
+							if v == "starter" {
+								inner = &house.Starter{Reach: h.Config.Loot.PickupRadius}
+							}
+							t := &timed{inner: inner}
 							tm = append(tm, t)
 							names[slot] = v
 							return t, v
@@ -177,7 +188,13 @@ func main() {
 				if *trace != "" && sd == *seed {
 					s.Rec = &sim.Recorder{}
 				}
-				s.Run()
+				if *mode == "practice" && s.Rec == nil {
+					for !s.Done && s.Mechs[mySlot].Alive {
+						s.Step()
+					}
+				} else {
+					s.Run()
+				}
 				if s.Rec != nil {
 					f, _ := os.Create(*trace)
 					json.NewEncoder(f).Encode(map[string]interface{}{"frames": s.Rec.Frames, "me": mySlot})
@@ -190,13 +207,49 @@ func main() {
 					if !ok {
 						continue
 					}
-					r := result{place: m.Place, kills: m.Kills, deathT: m.DeathT, cubes: m.Cubes, dealt: m.DmgDealt, taken: m.DmgTaken, zone: m.ZoneDmg, name: nm}
+					r := result{place: m.Place, kills: m.Kills, deathT: m.DeathT, cubes: m.Cubes, dealt: m.DmgDealt, taken: m.DmgTaken, zone: m.ZoneDmg, name: nm, shots: m.Shots, hits: m.Hits}
 					if ti < len(tm) {
 						r.maxMs = float64(tm[ti].max.Microseconds()) / 1000
 						r.avgMs = float64(tm[ti].sum.Microseconds()) / 1000 / float64(max(tm[ti].n, 1))
 						ti++
 					}
 					res[nm] = append(res[nm], r)
+					if *verbose && *mode != "ffa" && m.ID == mySlot {
+						type agg struct {
+							amt  float64
+							n    int
+							dist float64
+						}
+						by := map[string]*agg{}
+						for _, d := range m.DmgLog {
+							if d.T < m.DeathT-25 {
+								continue
+							}
+							nm := "npc"
+							if d.By < 100 && d.By >= 0 {
+								nm = fmt.Sprintf("%d:%s", d.By, s.Mechs[d.By].Name)
+							}
+							k := nm + "/" + d.Weapon
+							if by[k] == nil {
+								by[k] = &agg{}
+							}
+							by[k].amt += d.Amount
+							by[k].n++
+							by[k].dist += d.Dist
+						}
+						var ks []string
+						for k, a := range by {
+							ks = append(ks, fmt.Sprintf("%s %.0f(n%d,d%.0f)", k, a.amt, a.n, a.dist/float64(a.n)))
+						}
+						sort.Strings(ks)
+						wk := ""
+						for _, w := range m.W {
+							if w != nil {
+								wk += w.Kind + " "
+							}
+						}
+						fmt.Printf("[%d]   last25s: %s | my weapons: %s| ups %v\n", sd, strings.Join(ks, "; "), wk, m.Upgrades)
+					}
 					if *verbose && *mode != "ffa" {
 						fmt.Printf("[%d] %s place %d kills %d deathT %.0f cubes %d dealt %.0f taken %.0f zone %.0f\n", sd, nm, m.Place, m.Kills, m.DeathT, m.Cubes, m.DmgDealt, m.DmgTaken, m.ZoneDmg)
 					}
@@ -220,6 +273,7 @@ func main() {
 		rs := res[k]
 		var pts, kills, dt, mx, av, cubes, dealt, taken, zone float64
 		hist := make([]int, 17)
+		shots, hits := 0, 0
 		for _, r := range rs {
 			pts += float64(16 - r.place)
 			kills += float64(r.kills)
@@ -233,10 +287,12 @@ func main() {
 			}
 			av += r.avgMs
 			hist[r.place]++
+			shots += r.shots
+			hits += r.hits
 		}
 		c := float64(len(rs))
-		fmt.Printf("%-10s n=%-4d score %.2f  kills %.2f  life %.0fs  cubes %.1f  dealt %.0f taken %.0f zone %.0f  ms avg %.2f max %.1f  places %v\n",
-			k, len(rs), pts/c, kills/c, dt/c, cubes/c, dealt/c, taken/c, zone/c, av/c, mx, hist[1:])
+		fmt.Printf("%-10s n=%-4d score %.2f  kills %.2f  life %.0fs  cubes %.1f  dealt %.0f taken %.0f zone %.0f  ms avg %.2f max %.1f  acc %.2f  places %v\n",
+			k, len(rs), pts/c, kills/c, dt/c, cubes/c, dealt/c, taken/c, zone/c, av/c, mx, float64(hits)/float64(max(shots, 1)), hist[1:])
 	}
 	fmt.Println("elapsed", time.Since(t0).Round(time.Millisecond))
 }
