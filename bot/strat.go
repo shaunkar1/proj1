@@ -470,7 +470,12 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 		theirTTK = me.HP / math.Max(inc, 1)
-		engage = myTTK < b.P.EngageRatio*theirTTK || adv > 25
+		er := b.P.EngageRatio
+		if b.P.EarlyEngage > 0 && !b.practice && o.Alive > b.P.EarlyAlive {
+			// crowded early game: an even duel mostly feeds whoever shows up third
+			er *= b.P.EarlyEngage
+		}
+		engage = myTTK < er*theirTTK || (adv > 25 && er >= b.P.EngageRatio)
 		if nHostile >= 2 && myTTK > 2.5 {
 			engage = engage && myTTK*1.5 < theirTTK
 		}
@@ -525,7 +530,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.boost = me.Energy > 10
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
-	case boss != nil && (bossD < 210 || boss.LOS) && !(tgt == boss && finishing):
+	case boss != nil && (bossD < 150 || (boss.LOS && b.t-boss.Seen < 1.5)) && !(tgt == boss && finishing):
 		// outclassed: break its line and open the distance; shoot only if it costs nothing
 		mode = "avoid"
 		sp := b.findSafe(threats)
@@ -621,7 +626,9 @@ func (b *Bot) decide(act *proto.Action) {
 				if !b.w.Clear(b.muz[0], b.muz[1], b.muz[2], cp[0], cp[1], cp[2]) {
 					ctx.arrive = minD + 1 // no line on it from here: walk up to it
 				}
+				ctx.keepOff = minD + 1
 				if dC := hyp(px, py, cp[0], cp[1]); dC < minD {
+					// too close to bring the gun down onto it: step straight back
 					ux, uy := b.lastMove[0], b.lastMove[1]
 					if dC > 0.5 {
 						ux, uy = (px-cp[0])/dC, (py-cp[1])/dC
@@ -629,9 +636,15 @@ func (b *Bot) decide(act *proto.Action) {
 					if ux == 0 && uy == 0 {
 						ux = 1
 					}
-					goal = [2]float64{cp[0] + ux*(minD+4), cp[1] + uy*(minD+4)}
-					ctx.arrive = 1
-					ctx.mustMove = true
+					for _, rot := range [...]float64{0, 0.7, -0.7, 1.4, -1.4, 2.4, -2.4, math.Pi} {
+						c, sn := math.Cos(rot), math.Sin(rot)
+						vx, vy := ux*c-uy*sn, ux*sn+uy*c
+						if b.w.Nav.Walkable(px+vx*3, py+vy*3) && b.w.Nav.Walkable(px+vx*6, py+vy*6) {
+							b.backOff = [2]float64{vx, vy}
+							b.backOffT = b.t + 0.15
+							break
+						}
+					}
 				}
 				if b.objID != ob.item.ID {
 					b.objID, b.objT = ob.item.ID, b.t
@@ -654,6 +667,20 @@ func (b *Bot) decide(act *proto.Action) {
 				}
 				if hyp(goal[0], goal[1], px, py) < 30 {
 					ctx.boost = false // arrive with a full tank
+				}
+			case "cube":
+				ctx.arrive = 1.0
+				if ob.item != nil {
+					// a cube we cannot reach (ledge, under a roof, already gone) must not hold us
+					if b.objID != ob.item.ID {
+						b.objID, b.objT, b.objNearT = ob.item.ID, b.t, 0
+					}
+					if hyp(px, py, ob.item.Pos[0], ob.item.Pos[1]) < 2.8 {
+						b.objNearT += 0.1
+					}
+					if b.objNearT > 1.2 || b.t-b.objT > 6+hyp(px, py, ob.item.Pos[0], ob.item.Pos[1])/8 {
+						ob.item.Bad = b.t + 60
+					}
 				}
 			case "explore":
 				ctx.arrive = 20
@@ -802,6 +829,11 @@ func (b *Bot) decide(act *proto.Action) {
 			boost = !me.Grounded && me.Pos[2] < b.periZ+b.P.Periscope && me.Energy > 45 && b.t < 2.4
 		}
 	}
+	if b.t < b.backOffT && !climbing && mode == "crate" {
+		mx, my = b.backOff[0], b.backOff[1]
+		boost = false
+		climbing = true // skip steering this decision
+	}
 	if climbing {
 		b.stuckT = 0
 	} else if b.t < b.unstickT {
@@ -899,6 +931,29 @@ func (b *Bot) decide(act *proto.Action) {
 				break
 			}
 		}
+		// (crates do not count: in recorded matches repair kept running through crate hits)
+		if !shot && !b.P.OldReload {
+			if farm != nil {
+				shot = b.shootCrate(act, farm)
+			}
+			if !shot && !b.retreating {
+				var bc *Item
+				bd := 60.0
+				for _, c := range b.crateL {
+					if c.Roof && c.Pos[2] > me.Pos[2]+3 {
+						continue
+					}
+					d := hyp(c.Pos[0], c.Pos[1], px, py)
+					if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad {
+						bd, bc = d, c
+					}
+				}
+				if bc != nil {
+					shot = b.shootCrate(act, bc)
+				}
+			}
+			farmShot = shot
+		}
 	} else if !shot && shootT == nil {
 		// farm: nearest NPC shooting us or chosen, then crates
 		if farmNPC != nil && farmNPC.LOS {
@@ -944,7 +999,20 @@ func (b *Bot) decide(act *proto.Action) {
 	if gun, _ := b.weapon("gun"); gun != nil && gun.Reload <= 0 && gun.Ammo < gun.Stats.Mag {
 		// (a crate or drone under fire is not quiet: reloading after every round made farming crawl)
 		quiet := shootT == nil && (tgt == nil || !tgt.LOS) && !farmShot
-		if (quiet && gun.Ammo <= gun.Stats.Mag*0.5) || (quiet && tgt == nil && len(mechs) == 0 && gun.Ammo < gun.Stats.Mag) {
+		if quiet {
+			b.quietT += 0.1
+		} else {
+			b.quietT = 0
+		}
+		// topping up a nearly full magazine locked the gun for 2.4 s every time a
+		// single round had been fired: only reload when it is worth the pause
+		if b.P.OldReload {
+			if (quiet && gun.Ammo <= gun.Stats.Mag*0.5) || (quiet && tgt == nil && len(mechs) == 0 && gun.Ammo < gun.Stats.Mag) {
+				act.Reload = true
+			}
+		} else if (quiet && gun.Ammo <= gun.Stats.Mag*0.34) ||
+			(b.quietT > 1.5 && tgt == nil && len(mechs) == 0 && gun.Ammo <= gun.Stats.Mag*0.67 && mode != "crate" && mode != "npc") ||
+			(b.quietT > 6 && len(mechs) == 0 && gun.Ammo < gun.Stats.Mag && mode != "crate" && mode != "npc") {
 			act.Reload = true
 		}
 	}
@@ -968,6 +1036,9 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 		return true
 	}
 	if b.P.Aggressive {
+		return true
+	}
+	if b.isPrey(t, d, hpFrac) {
 		return true
 	}
 	if b.practice && b.P.PracBerserk {
@@ -1241,7 +1312,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
 		for _, t := range b.trackL {
-			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro)) {
+			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro) && !b.isPrey(t, hyp(px, py, t.Pos[0], t.Pos[1]), hpFrac)) {
 				continue
 			}
 			consider(objective{kind: "hunt", pos: t.Pos, value: 120 - (b.t-t.Seen)*3, trk: t})
@@ -1419,4 +1490,12 @@ func (b *Bot) dangerRatio(t *Track) float64 {
 	theirs := thp * b.enemyDps(t, 90)
 	ours := b.me.HP * math.Max(b.myDps(t, 90), 25)
 	return theirs / math.Max(ours, 1)
+}
+
+// isPrey: a mech we clearly outclass (kills are the main source of cubes).
+func (b *Bot) isPrey(t *Track, d, hpFrac float64) bool {
+	if b.P.PreyRatio <= 0 || b.practice || t.NPC || t.Ghost || b.boss != nil || hpFrac < 0.55 || d > 230 {
+		return false
+	}
+	return b.dangerRatio(t) < b.P.PreyRatio
 }

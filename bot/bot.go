@@ -38,15 +38,20 @@ type Params struct {
 	Roof            bool
 	NoDodge         bool
 	NoAdapt         bool
-	PracNoPeek      bool     // in practice (squad) matches, skip the laser-timing caution
-	PracNearFarm    bool     // in practice matches, only farm what is close
-	PracAggro       bool     // in practice matches, attack any mech on sight while healthy
-	PracRetreatHP   float64  // retreat threshold in practice matches (<0: same as RetreatHP)
-	PracBerserk     bool     // in practice matches always take the fight
-	PracFarmCubes   int      // in practice matches avoid mechs until we hold this many cubes ...
-	PracFarmT       float64  // ... or this much time has passed
-	PracAggroD      float64  // range of the practice attack-on-sight rule
-	PracAggroHP     float64  // health needed for it
+	PracNoPeek      bool    // in practice (squad) matches, skip the laser-timing caution
+	PracNearFarm    bool    // in practice matches, only farm what is close
+	PracAggro       bool    // in practice matches, attack any mech on sight while healthy
+	PracRetreatHP   float64 // retreat threshold in practice matches (<0: same as RetreatHP)
+	PracBerserk     bool    // in practice matches always take the fight
+	PracFarmCubes   int     // in practice matches avoid mechs until we hold this many cubes ...
+	PracFarmT       float64 // ... or this much time has passed
+	PracAggroD      float64 // range of the practice attack-on-sight rule
+	PracAggroHP     float64 // health needed for it
+	OldArrive       bool    // old behaviour: keep closing on the goal point inside the arrival ring
+	OldReload       bool    // old behaviour: top up the magazine whenever quiet
+	PreyRatio       float64 // free-for-all: attack on sight mechs whose danger ratio is below this (0: off)
+	EarlyEngage     float64 // free-for-all: engage-ratio multiplier while more than EarlyAlive mechs live (0: off)
+	EarlyAlive      int
 	NoFarCover      bool     // old behaviour: only look for cover within 78 m
 	SpinScan        bool     // look around by turning continuously instead of sweeping
 	Periscope       float64  // opening jet hop of this many metres to look over rooftops (0: off)
@@ -240,6 +245,10 @@ type Bot struct {
 	farmPhase     bool
 	patient       bool
 	farCover      float64
+	backOff       [2]float64
+	backOffT      float64
+	quietT        float64
+	objNearT      float64
 	farTry        float64
 	periZ         float64
 	boss          *Track

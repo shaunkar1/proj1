@@ -120,6 +120,29 @@ func Variant(name string) Params {
 		p.Periscope = 20
 	case "nofarcover":
 		p.NoFarCover = true
+	case "boss15":
+		p.BossRatio = 1.5
+	case "early06":
+		p.EarlyEngage = 0.6
+		p.EarlyAlive = 8
+	case "early06b15":
+		p.EarlyEngage = 0.6
+		p.EarlyAlive = 8
+		p.BossRatio = 1.5
+	case "early05a6":
+		p.EarlyEngage = 0.5
+		p.EarlyAlive = 6
+	case "prey05":
+		p.PreyRatio = 0.5
+	case "prey03":
+		p.PreyRatio = 0.3
+	case "prey05e":
+		p.PreyRatio = 0.5
+		p.EarlyEngage = 0.6
+		p.EarlyAlive = 8
+	case "oldfarm":
+		p.OldArrive = true
+		p.OldReload = true
 	case "explore":
 		p.NoExplore = false
 	case "survivor":
