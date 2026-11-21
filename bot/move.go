@@ -147,6 +147,11 @@ func (b *Bot) exposed(eye [3]float64, x, y, z float64) bool {
 	return b.w.ClearCoarse(eye[0], eye[1], eye[2], x, y, z)
 }
 
+// peekOn: use enemy-laser timing and corner play?
+func (b *Bot) peekOn() bool {
+	return !b.P.NoPeek && !(b.practice && b.P.PracNoPeek)
+}
+
 // bodyExposed: could a shot from eye reach any part of our body standing at
 // (x,y) on ground gz? Tests the centre, the top and both flanks, because half
 // a mech sticking out past a corner is still a target.
@@ -310,7 +315,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	var bx, by float64
 	_ = 9.0
 	// laser timing: who could put a beam on us within the next moment, and is ours ready?
-	peek := !b.P.NoPeek
+	peek := b.peekOn()
 	myLasReady, haveLas := false, false
 	lasVal := 0.0
 	if las, _ := b.weapon("laser"); las != nil {

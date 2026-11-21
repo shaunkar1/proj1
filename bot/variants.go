@@ -60,6 +60,11 @@ func Variant(name string) Params {
 		p.NoDodge = true
 	case "lasltn":
 		p.DropGunForLtn = true
+	case "pracaggro":
+		p.PracAggro = true
+	case "pracpeek":
+		p.PracNoPeek = false
+		p.PracNearFarm = false
 	case "nopeek":
 		p.NoPeek = true
 	case "aggronp":

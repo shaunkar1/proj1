@@ -419,7 +419,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		md := b.myDps(tgt, dEval)
 		inc := b.enemyDps(tgt, dEval)
-		if !b.P.NoPeek && tgt.has[2] && b.coverNear {
+		if b.peekOn() && tgt.has[2] && b.coverNear {
 			// with a corner to work from we only show ourselves while its laser is down
 			inc = b.enemyDpsNL(tgt, dEval)*0.7 + 35
 			md *= 0.7
@@ -777,7 +777,7 @@ func (b *Bot) decide(act *proto.Action) {
 		if las, li := b.weapon("laser"); las != nil && las.Charge > 0 {
 			act.Fire[li] = true // keep the charge
 		} else if las != nil && las.Cooldown <= 0.11 && b.t-tgt.Seen < 0.3 && mode == "fight" && hyp(px, py, tgt.Pos[0], tgt.Pos[1]) < las.Stats.Range &&
-			(b.P.NoPeek || !(tgt.has[2] && tgt.Charging)) {
+			(!b.peekOn() || !(tgt.has[2] && tgt.Charging)) {
 			act.Fire[li] = true // charge behind cover; step out when it is ready
 		}
 		shot = true
@@ -851,6 +851,9 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 		return true
 	}
 	if b.P.Aggressive {
+		return true
+	}
+	if b.practice && b.P.PracAggro && hpFrac > 0.6 && d < 160 {
 		return true
 	}
 	if t.HP < 0.4*t.MaxHP && hpFrac > 0.6 && d < 150 {
@@ -959,7 +962,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if zEnd.outside(ob.pos[0], ob.pos[1]) > -8 && d/me.Stats.WalkSpeed*1.6+4 > budget {
 			return
 		}
-		s := ob.value - d*0.6
+		k := 0.6
+		if b.practice && b.P.PracNearFarm {
+			k = 1.3 // hunters are coming to us: do not wander off for loot
+		}
+		s := ob.value - d*k
 		if ob.kind == b.lastObjKind && hyp(ob.pos[0], ob.pos[1], b.lastObjPos[0], b.lastObjPos[1]) < 3 {
 			s += 15 // finish what we started
 		}

@@ -38,6 +38,9 @@ type Params struct {
 	Roof          bool
 	NoDodge       bool
 	NoAdapt       bool
+	PracNoPeek    bool // in practice (squad) matches, skip the laser-timing caution
+	PracNearFarm  bool // in practice matches, only farm what is close
+	PracAggro     bool // in practice matches, attack any mech on sight while healthy
 	NoPeek        bool // ignore enemy laser timing (old behaviour)
 	Still         bool // test: never move
 	NoFire        bool // test: never shoot
@@ -54,7 +57,8 @@ func DefaultParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
 		LeadScale:  1.0,
-		Roof:       true,
+		PracNoPeek: true, PracNearFarm: true,
+		Roof: true,
 	}
 }
 
@@ -171,49 +175,51 @@ type Bot struct {
 	wantMove   bool
 
 	// combat state
-	targetID    int
-	retreating  bool
-	lastDmgT    float64 // last time I took weapon damage
-	lastDmgBy   int
-	lastDmgDir  float64
-	dmgRecent   float64 // decayed incoming dps estimate
-	scanPhase   float64
-	lasHold     bool
-	cmdAim      [2]float64
-	kills       int
-	othersDied  int
-	prevAlive   int
-	mode        string
-	goalKind    string
-	takeTryT    float64
-	hearT       float64
-	hearDir     float64
-	safeSpot    [2]float64
-	safeT       float64
-	roamGoal    [2]float64
-	roamT       float64
-	blockedC    map[int]float64
-	lastObjKind string
-	lastObjPos  [3]float64
-	objID       int
-	objT        float64
-	searchTick  int  // tick of the last path search (at most one per decision)
-	lasFree     bool // no mech around: the laser may be spent on crates
-	lasCrate    bool
-	coverNear   bool      // last steer found a spot hidden from the target close by
-	hop         *geo.Exit // jet hop in progress (or being walked to)
-	hopFly      bool
-	hopT        float64
-	hopFail     float64
-	climbID     int
-	climbT      float64
-	climbPos    [3]float64
-	climbFrom   [2]float64
-	spawnYaw    float64
-	zonePathT   float64
-	zonePathG   [2]float64
-	zonePathC   float64
-	dbg         string
+	targetID      int
+	retreating    bool
+	lastDmgT      float64 // last time I took weapon damage
+	lastDmgBy     int
+	lastDmgDir    float64
+	dmgRecent     float64 // decayed incoming dps estimate
+	scanPhase     float64
+	lasHold       bool
+	cmdAim        [2]float64
+	kills         int
+	othersDied    int
+	prevAlive     int
+	mode          string
+	goalKind      string
+	takeTryT      float64
+	hearT         float64
+	hearDir       float64
+	safeSpot      [2]float64
+	safeT         float64
+	roamGoal      [2]float64
+	roamT         float64
+	blockedC      map[int]float64
+	lastObjKind   string
+	lastObjPos    [3]float64
+	objID         int
+	objT          float64
+	searchTick    int  // tick of the last path search (at most one per decision)
+	lasFree       bool // no mech around: the laser may be spent on crates
+	lasCrate      bool
+	coverNear     bool // last steer found a spot hidden from the target close by
+	practice      bool // looks like a squad match (see perceive)
+	sawOtherDeath bool
+	hop           *geo.Exit // jet hop in progress (or being walked to)
+	hopFly        bool
+	hopT          float64
+	hopFail       float64
+	climbID       int
+	climbT        float64
+	climbPos      [3]float64
+	climbFrom     [2]float64
+	spawnYaw      float64
+	zonePathT     float64
+	zonePathG     [2]float64
+	zonePathC     float64
+	dbg           string
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
@@ -506,6 +512,11 @@ func (b *Bot) perceive(o *proto.Obs) {
 		b.prevAlive = o.Alive
 	}
 	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
+	if b.othersDied > 0 {
+		b.sawOtherDeath = true
+	}
+	// practice = everyone else is one squad: nobody dies unless we kill them
+	b.practice = !b.sawOtherDeath && o.T > 20
 	for _, s := range o.Sounds {
 		if s.Dist == "near" && (s.Kind == "step" || s.Kind == "boost" || s.Kind == "jet" || s.Kind == "reload" || s.Kind == "laser_charge" || s.Kind == "lightning" || s.Kind == "gun") {
 			b.hearT = o.T - s.Age

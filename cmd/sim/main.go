@@ -125,6 +125,7 @@ func main() {
 			for sd := range jobs {
 				var tm []*timed
 				var dumpW *bufio.Writer
+				var exts []*sim.ExtBot
 				names := map[int]string{}
 				sq := house.NewSquad()
 				sq.LateT = *late
@@ -148,9 +149,15 @@ func main() {
 					if *mode == "duel" {
 						if slot == mySlot {
 							v := cands[0]
-							var inner sim.Controller = bot.New(h, w, bot.Variant(v))
-							if v == "starter" {
+							var inner sim.Controller
+							if strings.HasPrefix(v, "ext:") {
+								e := sim.NewExtBot(v[4:], h)
+								exts = append(exts, e)
+								inner = e
+							} else if v == "starter" {
 								inner = &house.Starter{Reach: h.Config.Loot.PickupRadius}
+							} else {
+								inner = bot.New(h, w, bot.Variant(v))
 							}
 							t := &timed{inner: inner}
 							tm = append(tm, t)
@@ -167,9 +174,15 @@ func main() {
 					if *mode == "practice" {
 						if slot == mySlot {
 							v := cands[int(sd)%len(cands)]
-							var inner sim.Controller = bot.New(h, w, bot.Variant(v))
-							if v == "starter" {
+							var inner sim.Controller
+							if strings.HasPrefix(v, "ext:") {
+								e := sim.NewExtBot(v[4:], h)
+								exts = append(exts, e)
+								inner = e
+							} else if v == "starter" {
 								inner = &house.Starter{Reach: h.Config.Loot.PickupRadius}
+							} else {
+								inner = bot.New(h, w, bot.Variant(v))
 							}
 							if *dump != "" && sd == *seed {
 								f, _ := os.Create(*dump)
@@ -202,6 +215,11 @@ func main() {
 					}
 					v := cands[(slot+int(sd))%len(cands)]
 					names[slot] = v
+					if strings.HasPrefix(v, "ext:") {
+						e := sim.NewExtBot(v[4:], h)
+						exts = append(exts, e)
+						return e, v
+					}
 					if strings.HasPrefix(v, "house") {
 						lvl := int(v[len(v)-1] - '0')
 						return house.New(h, w, nil, lvl), v
@@ -231,6 +249,9 @@ func main() {
 					}
 				} else {
 					s.Run()
+				}
+				for _, e := range exts {
+					e.Close()
 				}
 				if dumpW != nil {
 					dumpW.WriteString(`{"type":"end","place":1,"kills":0}` + "\n")
