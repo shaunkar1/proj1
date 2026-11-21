@@ -748,6 +748,8 @@ func (b *Bot) probeStop() bool {
 		return b.kills >= 15-b.slot
 	case "seedlow":
 		return b.seed < 1000000
+	case "seedhi":
+		return b.seed >= 1<<31
 	case "seedodd":
 		return b.seed%2 == 1
 	case "idle":
