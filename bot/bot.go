@@ -105,6 +105,7 @@ type Params struct {
 	ZoneLead        float64 // known free-for-all: start walking in when this many spare seconds are left (0: only when late)
 	CrossAlive      int     // known free-for-all: with this many mechs or fewer left, skip errands that stand in the open lanes of two laser carriers (0: off)
 	CrossD          float64 // ... counted within this range of the errand
+	ShyMem          float64 // known free-for-all, quiet: how long a mech's last seen position keeps errands away (0: 8 s)
 	EndgameFFA      int     // known free-for-all: after the first death, with this many mechs or fewer left (more than two), only fight back
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)

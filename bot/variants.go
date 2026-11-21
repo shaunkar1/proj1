@@ -322,6 +322,12 @@ func Variant(name string) Params {
 	case "qc360":
 		p.FFA0 = "always"
 		p.QuietCap = 360
+	case "sm16":
+		p.FFA0 = "always"
+		p.ShyMem = 16
+	case "sm24":
+		p.FFA0 = "always"
+		p.ShyMem = 24
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240

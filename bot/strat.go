@@ -1648,7 +1648,12 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				if !b.ffaSure && !soft && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
 					break
 				}
-				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
+				if mem := 8.0; t.NPC || t.Ghost || b.t-t.Seen > func() float64 {
+					if b.ffaSure && b.P.ShyMem > 0 {
+						mem = b.P.ShyMem
+					}
+					return mem
+				}() {
 					continue
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
