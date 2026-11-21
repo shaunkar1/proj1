@@ -1610,6 +1610,22 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				return
 			}
 		}
+		if b.P.CrossAlive > 0 && b.ffaSure && !b.practice && b.o.Alive <= b.P.CrossAlive && d > 12 {
+			// late deaths in recorded matches: 1,500 HP gone in under 10 s to two lasers at once
+			lanes := 0
+			gz := b.w.Ground(ob.pos[0], ob.pos[1]) + 2.0
+			for _, t := range b.trackL {
+				if t.NPC || t.Ghost || b.t-t.Seen > 10 || !t.has[2] {
+					continue
+				}
+				if db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1]); db < b.P.CrossD && b.w.ClearCoarse(t.Pos[0], t.Pos[1], t.Pos[2]+2.0, ob.pos[0], ob.pos[1], gz) {
+					lanes++
+				}
+			}
+			if lanes >= 2 {
+				return
+			}
+		}
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
 			// repairing: only what is a few steps away and does not interrupt it -
 			// except a weapon while we have none worth the name
@@ -1632,7 +1648,12 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				if !b.ffaSure && !soft && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
 					break
 				}
-				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
+				if mem := 8.0; t.NPC || t.Ghost || b.t-t.Seen > func() float64 {
+					if b.ffaSure && b.P.ShyMem > 0 {
+						mem = b.P.ShyMem
+					}
+					return mem
+				}() {
 					continue
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
