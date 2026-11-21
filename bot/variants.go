@@ -122,6 +122,25 @@ func Variant(name string) Params {
 		p.NoFarCover = true
 	case "boss15":
 		p.BossRatio = 1.5
+	case "ambush":
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 200, 1.4, 1.3
+	case "ambush250":
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 250, 1.6, 1.6
+	case "ambushe":
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 200, 1.4, 1.3
+		p.EarlyEngage = 0.6
+		p.EarlyAlive = 8
+	case "snipe":
+		p.Snipe = 265
+	case "preempt":
+		p.Preempt = 200
+	case "opener":
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 220, 1.4, 1.3
+		p.Snipe = 265
+	case "opener3":
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 220, 1.4, 1.3
+		p.Snipe = 265
+		p.Preempt = 200
 	case "early06":
 		p.EarlyEngage = 0.6
 		p.EarlyAlive = 8

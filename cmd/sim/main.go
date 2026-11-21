@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,8 @@ func (d *dumper) Act(o *proto.Obs) proto.Action {
 	return d.inner.Act(o)
 }
 
+var slowLog = func() int { n, _ := strconv.Atoi(os.Getenv("SLOWLOG")); return n }()
+
 type timed struct {
 	inner sim.Controller
 	max   time.Duration
@@ -46,6 +49,13 @@ func (t *timed) Act(o *proto.Obs) proto.Action {
 	d := time.Since(t0)
 	if d > t.max {
 		t.max = d
+	}
+	if slowLog > 0 && d > time.Duration(slowLog)*time.Millisecond {
+		mode := ""
+		if m, ok := t.inner.(interface{ DbgMode() string }); ok {
+			mode = m.DbgMode()
+		}
+		fmt.Fprintf(os.Stderr, "SLOW %.1fms t=%.1f mode=%s\n", float64(d.Microseconds())/1000, o.T, mode)
 	}
 	t.sum += d
 	t.n++

@@ -67,6 +67,11 @@ type Params struct {
 	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
 	ChaseD          float64  // range held while chasing
 	PracStopKills   int      // measurement: go idle in practice after this many kills
+	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
+	AmbushAng       float64  // how far off us its aim must be (rad)
+	AmbushRatio     float64  // skip targets more dangerous than this ratio
+	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
+	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	FixRange        float64  // fixed fighting distance in every mode (test stand-ins)
 	PracRange       float64  // fixed fighting distance in practice matches (0: choose by damage model)
 	Endgame         int      // free-for-all: with this many mechs left (but more than two), only fight back
@@ -654,3 +659,6 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 	b.trace(act)
 	return act
 }
+
+// DbgMode returns the last decision's mode label (for tooling).
+func (b *Bot) DbgMode() string { return b.dbg }
