@@ -503,6 +503,12 @@ func Variant(name string) Params {
 	case "survivor":
 		p.Endgame = 16
 		p.HuntPassive = false
+	case "survq":
+		p.Endgame = 16
+		p.HuntPassive = false
+		p.QuietCap = 300
+	case "surv":
+		p.Endgame = 16
 	case "patient6":
 		p.Endgame = 6
 	case "patient4":
