@@ -118,6 +118,8 @@ func Variant(name string) Params {
 	case "spinperi":
 		p.SpinScan = true
 		p.Periscope = 20
+	case "nofarcover":
+		p.NoFarCover = true
 	case "explore":
 		p.NoExplore = false
 	case "survivor":

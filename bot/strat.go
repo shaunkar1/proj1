@@ -535,12 +535,21 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.wGoal = 1.5
 		ctx.mustMove = boss.LOS && b.t-boss.Seen < 1
+		if b.t < b.farCover {
+			ctx.wGoal = 4
+			ctx.mustMove = true
+			ctx.boost = me.Energy > 6
+		}
 	case b.retreating || (tgt != nil && !engage && (underFire || incoming > 0)):
 		mode = "retreat"
 		sp := b.findSafe(threats)
 		goal, hasGoal = sp, true
 		ctx.hide = true
 		ctx.boost = me.Energy > 12 && (underFire || incoming > 0)
+		if b.t < b.farCover {
+			ctx.wGoal = 4
+			ctx.mustMove = true
+		}
 		ctx.target = tgt
 		ctx.wGoal = 1.5
 	case tgt != nil && engage:
@@ -1052,8 +1061,63 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 			bs, best = s, [2]float64{x, y}
 		}
 	}
+	keep := 2.5
+	if !b.P.NoFarCover && b.t >= b.farTry {
+		// nothing close breaks every hostile line (open ground): commit to the nearest
+		// cover further out instead of dithering where we stand
+		var hs [2]*threat // the two nearest hostile mechs: enough to pick a side
+		for i := range threats {
+			th := &threats[i]
+			if th.t.NPC || th.weight < 1 || b.t-th.t.Seen > 3 {
+				continue
+			}
+			d := hyp(px, py, th.t.Pos[0], th.t.Pos[1])
+			if hs[0] == nil || d < hyp(px, py, hs[0].t.Pos[0], hs[0].t.Pos[1]) {
+				hs[1], hs[0] = hs[0], th
+			} else if hs[1] == nil || d < hyp(px, py, hs[1].t.Pos[0], hs[1].t.Pos[1]) {
+				hs[1] = th
+			}
+		}
+		exposedAt := func(x, y float64) bool {
+			z := b.w.Ground(x, y)
+			for _, th := range hs {
+				if th != nil && b.bodyExposed(th.eye, x, y, z) {
+					return true
+				}
+			}
+			return false
+		}
+		if hs[0] != nil && exposedAt(best[0], best[1]) {
+			b.farTry = b.t + 1.2
+			found := false
+			for ring := 0; ring < 4 && !found; ring++ {
+				r := 55 + float64(ring)*30
+				fd := math.Inf(1)
+				for k := 0; k < 16; k++ {
+					a := (float64(k) + b.rng.Float64()) * 2 * math.Pi / 16
+					x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+					if !nv.WalkableMain(x, y) || zs.outside(x, y) > -6 {
+						continue
+					}
+					// not toward the enemy
+					d0 := hyp(x, y, hs[0].t.Pos[0], hs[0].t.Pos[1])
+					if d0 < hyp(px, py, hs[0].t.Pos[0], hs[0].t.Pos[1])*0.8 || exposedAt(x, y) {
+						continue
+					}
+					if c := b.roughDist(x, y) - d0*0.2; c < fd {
+						fd, best = c, [2]float64{x, y}
+						found = true
+					}
+				}
+			}
+			if found {
+				keep = 6
+				b.farCover = b.t + 6
+			}
+		}
+	}
 	b.safeSpot = best
-	b.safeT = b.t + 2.5
+	b.safeT = b.t + keep
 	return best
 }
 

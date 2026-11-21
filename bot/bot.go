@@ -47,6 +47,7 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	NoFarCover      bool     // old behaviour: only look for cover within 78 m
 	SpinScan        bool     // look around by turning continuously instead of sweeping
 	Periscope       float64  // opening jet hop of this many metres to look over rooftops (0: off)
 	BossRatio       float64  // free-for-all: avoid mechs this many times stronger than us (0: off)
@@ -238,6 +239,8 @@ type Bot struct {
 	practice      bool // looks like a squad match (see perceive)
 	farmPhase     bool
 	patient       bool
+	farCover      float64
+	farTry        float64
 	periZ         float64
 	boss          *Track
 	sawOtherDeath bool
