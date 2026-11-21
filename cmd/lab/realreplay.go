@@ -182,6 +182,25 @@ func main() {
 		}
 		// world events
 		realFire := ""
+		var sounds []proto.SoundObs
+		hear := func(id int, kind string) {
+			m := cur[id]
+			if m == nil {
+				return
+			}
+			rng := h.Config.Sound.Range[kind]
+			d := math.Hypot(m[1]-mm[1], m[2]-mm[2])
+			if rng <= 0 || d > rng {
+				return
+			}
+			band := "far"
+			if d < 60 {
+				band = "near"
+			} else if d < 160 {
+				band = "mid"
+			}
+			sounds = append(sounds, proto.SoundObs{Kind: kind, Bearing: math.Atan2(m[2]-mm[2], m[1]-mm[1]) + 0.12*math.Sin(float64(f.T*7+id*13)), Dist: band, Age: 0.05})
+		}
 		for _, e := range f.Ev {
 			switch e.E {
 			case "hit":
@@ -249,10 +268,18 @@ func main() {
 				if e.ID != nil && *e.ID == me {
 					realFire += " REAL-FIRE:" + e.W
 					realShots++
+				} else if e.ID != nil && *e.ID < 100 {
+					hear(*e.ID, e.W)
 				}
 			case "laser":
 				if e.ID != nil && *e.ID == me {
 					realFire += " REAL-LASER"
+				} else if e.ID != nil && *e.ID < 100 {
+					hear(*e.ID, "laser")
+				}
+			case "zap":
+				if e.ID != nil && *e.ID != me && *e.ID < 100 {
+					hear(*e.ID, "lightning")
 				}
 			}
 		}
@@ -375,6 +402,7 @@ func main() {
 		o.Self.InZone = math.Hypot(mm[1]-f.Z[0], mm[2]-f.Z[1]) <= f.Z[2]
 		o.Events = pending
 		pending = nil
+		o.Sounds = sounds
 
 		act = b.Act(&o)
 
