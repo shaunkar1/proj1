@@ -130,6 +130,8 @@ func Variant(name string) Params {
 		p.Ambush, p.AmbushAng, p.AmbushRatio = 200, 1.4, 1.3
 		p.EarlyEngage = 0.6
 		p.EarlyAlive = 8
+	case "nobiter":
+		p.NoBiter = true
 	case "snipe":
 		p.Snipe = 265
 	case "preempt":

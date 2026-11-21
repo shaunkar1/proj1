@@ -930,8 +930,33 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	holdFire := mode == "retreat" && b.retreating && !underFire && incoming == 0 // let regen start
+	// a drone that is hitting us: it blocks repairs, follows at walking pace and is
+	// eight gun rounds from dead (lost a recorded match standing next to one at 163 HP)
+	var biter *Track
+	if !b.P.NoBiter {
+		for _, t := range b.trackL {
+			if t.NPC && b.t-t.HitMe < 3 && b.t-t.Seen < 6 && (biter == nil || t.HitMe > biter.HitMe) {
+				biter = t
+			}
+		}
+	}
+	npcShot := false
 	if shootT != nil && !holdFire {
 		shot = b.shootMech(act, shootT)
+	} else if biter != nil {
+		if biter.LOS && b.t-biter.Seen < 0.3 {
+			shot = b.shootMech(act, biter)
+		}
+		if !shot {
+			// not in view: turn to it
+			y, p, _ := b.aimAt([3]float64{biter.Pos[0], biter.Pos[1], biter.Pos[2] + 1.5})
+			act.Aim = [2]float64{y, p}
+			shot = true
+		}
+		npcShot = true
+		if las, li := b.weapon("laser"); las != nil && las.Charge > 0 && !act.Fire[li] {
+			act.Fire[li] = true // keep any charge we were holding
+		}
 	} else if tgt != nil && !holdFire {
 		// no line: pre-aim where it is
 		y, p, _ := b.aimAt(b.predict(tgt, latency))
@@ -1021,7 +1046,7 @@ func (b *Bot) decide(act *proto.Action) {
 	// reload when quiet
 	if gun, _ := b.weapon("gun"); gun != nil && gun.Reload <= 0 && gun.Ammo < gun.Stats.Mag {
 		// (a crate or drone under fire is not quiet: reloading after every round made farming crawl)
-		quiet := shootT == nil && (tgt == nil || !tgt.LOS) && !farmShot
+		quiet := shootT == nil && (tgt == nil || !tgt.LOS) && !farmShot && !npcShot
 		if quiet {
 			b.quietT += 0.1
 		} else {
