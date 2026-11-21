@@ -20,6 +20,18 @@ import (
 	"mechbot/sim"
 )
 
+type dumper struct {
+	inner sim.Controller
+	w     *bufio.Writer
+}
+
+func (d *dumper) Act(o *proto.Obs) proto.Action {
+	b, _ := json.Marshal(o)
+	d.w.Write(b)
+	d.w.WriteByte('\n')
+	return d.inner.Act(o)
+}
+
 type timed struct {
 	inner sim.Controller
 	max   time.Duration
@@ -88,6 +100,7 @@ func main() {
 	opp := flag.String("opp", "house0", "duel opponent: houseN or a variant")
 	sep := flag.Float64("sep", 130, "duel spawn separation")
 	loot := flag.Bool("loot", false, "duel: keep loot, crates, NPCs")
+	dump := flag.String("dump", "", "practice: write the candidate's hello and observations of the first match here")
 	trace := flag.String("trace", "", "write a trace of the first match to this file")
 	flag.Parse()
 
@@ -111,6 +124,7 @@ func main() {
 			w := w0.CloneScratch()
 			for sd := range jobs {
 				var tm []*timed
+				var dumpW *bufio.Writer
 				names := map[int]string{}
 				sq := house.NewSquad()
 				sq.LateT = *late
@@ -156,6 +170,15 @@ func main() {
 							var inner sim.Controller = bot.New(h, w, bot.Variant(v))
 							if v == "starter" {
 								inner = &house.Starter{Reach: h.Config.Loot.PickupRadius}
+							}
+							if *dump != "" && sd == *seed {
+								f, _ := os.Create(*dump)
+								bw := bufio.NewWriterSize(f, 1<<20)
+								hb, _ := json.Marshal(h)
+								bw.Write(hb)
+								bw.WriteByte('\n')
+								inner = &dumper{inner: inner, w: bw}
+								dumpW = bw
 							}
 							t := &timed{inner: inner}
 							tm = append(tm, t)
@@ -208,6 +231,10 @@ func main() {
 					}
 				} else {
 					s.Run()
+				}
+				if dumpW != nil {
+					dumpW.WriteString(`{"type":"end","place":1,"kills":0}` + "\n")
+					dumpW.Flush()
 				}
 				if s.Rec != nil {
 					f, _ := os.Create(*trace)

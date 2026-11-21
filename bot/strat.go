@@ -165,11 +165,32 @@ func (b *Bot) pickUpgrade(o *proto.Offer) int {
 	return bi
 }
 
-func (b *Bot) slot1Rank() float64 {
-	if len(b.me.Weapons) > 1 && b.me.Weapons[1] != nil {
-		return b.P.WeaponRank[b.me.Weapons[1].Kind]
+// heldRank is how much we value keeping the weapon in a slot.
+func (b *Bot) heldRank(w *proto.WeaponObs) float64 {
+	if w == nil {
+		return 0
 	}
-	return 0
+	if w.Kind == "gun" {
+		// the gun is only ever given up for the laser+lightning pairing
+		if b.P.DropGunForLtn && b.holds("laser") {
+			return 0.5
+		}
+		return 99
+	}
+	return b.P.WeaponRank[w.Kind]
+}
+
+func (b *Bot) slot1Rank() float64 {
+	r := 99.0
+	for _, w := range b.me.Weapons {
+		if v := b.heldRank(w); v < r {
+			r = v
+		}
+	}
+	if r == 99 {
+		return 0
+	}
+	return r
 }
 
 func (b *Bot) holds(kind string) bool {
@@ -182,7 +203,11 @@ func (b *Bot) wantPickup(it *Item) float64 {
 	if it.Kind == "gun" || b.holds(it.Kind) {
 		return 0
 	}
-	return b.P.WeaponRank[it.Kind] - b.slot1Rank()
+	v := b.P.WeaponRank[it.Kind] - b.slot1Rank()
+	if it.Kind == "lightning" && b.slot1Rank() == 0.5 {
+		v = 1.2 // lightning in place of the gun, next to a laser
+	}
+	return v
 }
 
 func (b *Bot) tryTake(act *proto.Action) {
@@ -203,13 +228,23 @@ func (b *Bot) tryTake(act *proto.Action) {
 	if best == nil {
 		return
 	}
-	// do not swap a charging laser
-	if len(me.Weapons) > 1 && me.Weapons[1] != nil {
-		if me.Weapons[1].Kind == "laser" && me.Weapons[1].Charge > 0 {
-			return
+	// which slot gives way: an empty one, else the least valued
+	slot, low := -1, 1e9
+	for i, w := range me.Weapons {
+		if w == nil {
+			slot, low = -1, -1
+			break
 		}
-		one := 1
-		act.Drop = &one
+		if r := b.heldRank(w); r < low {
+			low, slot = r, i
+		}
+	}
+	if slot >= 0 {
+		if w := me.Weapons[slot]; w.Kind == "laser" && w.Charge > 0 {
+			return // cannot swap a charging laser
+		}
+		sl := slot
+		act.Drop = &sl
 	}
 	id := best.ID
 	act.Take = &id

@@ -31,6 +31,7 @@ type Params struct {
 	FarmNPC       bool
 	UseDrops      bool
 	DropGunForLas bool
+	DropGunForLtn bool // with a laser in hand, trade the gun for lightning
 	UpgradePrio   []string
 	WeaponRank    map[string]float64
 	LeadScale     float64
