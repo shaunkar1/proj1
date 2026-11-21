@@ -57,17 +57,26 @@ type Params struct {
 	PreyRatio       float64 // free-for-all: attack on sight mechs whose danger ratio is below this (0: off)
 	EarlyEngage     float64 // free-for-all: engage-ratio multiplier while more than EarlyAlive mechs live (0: off)
 	EarlyAlive      int
-	NoFarCover      bool     // old behaviour: only look for cover within 78 m
-	SpinScan        bool     // look around by turning continuously instead of sweeping
-	Periscope       float64  // opening jet hop of this many metres to look over rooftops (0: off)
-	BossRatio       float64  // free-for-all: avoid mechs this many times stronger than us (0: off)
-	NoLaserRush     bool     // old behaviour: no extra pull toward lasers and unseen ground
-	NoExplore       bool     // old behaviour: roam at random instead of toward unseen ground
-	NoLasCheck      bool     // old behaviour: release the laser without checking the muzzle line
-	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
-	ChaseD          float64  // range held while chasing
-	PracStopKills   int      // measurement: go idle in practice after this many kills
-	Probe           string   // measurement runs (see probeStop)
+	NoFarCover      bool    // old behaviour: only look for cover within 78 m
+	SpinScan        bool    // look around by turning continuously instead of sweeping
+	Periscope       float64 // opening jet hop of this many metres to look over rooftops (0: off)
+	BossRatio       float64 // free-for-all: avoid mechs this many times stronger than us (0: off)
+	NoLaserRush     bool    // old behaviour: no extra pull toward lasers and unseen ground
+	NoExplore       bool    // old behaviour: roam at random instead of toward unseen ground
+	NoLasCheck      bool    // old behaviour: release the laser without checking the muzzle line
+	ChaseHP         float64 // close in on a lone target below this health fraction (0: off)
+	ChaseD          float64 // range held while chasing
+	PracStopKills   int     // measurement: go idle in practice after this many kills
+	Probe           string  // measurement runs (see probeStop)
+	Open            bool    // strike first with a ready laser, or at a mech busy with someone else
+	OpenRatio       float64 // ... unless it is this much stronger than us
+	OpenHP          float64
+	OpenBusyD       float64
+	NoOpenLas       bool
+	FFA0            string   // start-of-match free-for-all test (see ffaAtStart)
+	Grab            float64  // weapon within this many metres is fetched before anything else (0 = off)
+	GrabAlways      bool     // also before the match is known to be a free-for-all
+	ScanFirst       bool     // finish the first look around before shooting crates
 	PracLtnRank     float64  // squad matches: value of lightning as a second weapon (0: the usual rank; laser is 3)
 	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
 	AmbushAng       float64  // how far off us its aim must be (rad)
@@ -119,7 +128,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, Open: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -157,6 +166,7 @@ type Track struct {
 	Hostile     float64    // considered hostile until this time
 	aimedAt     float64    // accumulated seconds spent aiming at us
 	has         [4]bool    // gun mortar laser lightning
+	busyT       float64    // last time it was seen fighting someone else
 }
 
 func (t *Track) Center() [3]float64 {
@@ -290,6 +300,8 @@ type Bot struct {
 	seed          int64
 	peer          *Track
 	sawOtherDeath bool
+	grabID        int
+	grabT         float64
 	hop           *geo.Exit // jet hop in progress (or being walked to)
 	hopFly        bool
 	hopT          float64
@@ -308,6 +320,9 @@ type Bot struct {
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
 	b.seed = int64(h.Seed)
+	if b.ffaAtStart() {
+		b.ffaSure, b.sawOtherDeath = true, true
+	}
 	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot)))
 	b.tracks = map[int]*Track{}
 	b.pickups = map[int]*Item{}
@@ -365,8 +380,11 @@ func (b *Bot) perceive(o *proto.Obs) {
 		a := &o.Mechs[i]
 		t := b.tracks[a.ID]
 		if t == nil {
-			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, Scale: 1, lasFireT: -100, lasChargeT: -100}
+			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, busyT: -100, Scale: 1, lasFireT: -100, lasChargeT: -100}
 			b.tracks[a.ID] = t
+		}
+		if !t.NPC && !t.Ghost && o.T-t.Seen < 0.35 && a.HP < t.HP-20 && o.T-t.IHit > 0.45 {
+			t.busyT = o.T // someone else is hurting it
 		}
 		t.Ghost = false
 		t.PrevVel = t.Vel
@@ -441,6 +459,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 				}
 			} else {
 				t.aimedAt = math.Max(0, t.aimedAt-0.05)
+			}
+			if a.Charging && off > 0.6 {
+				t.busyT = o.T // lining up on somebody else
 			}
 			if t.aimedAt >= 0.6 {
 				t.Hostile = math.Max(t.Hostile, o.T+8)
@@ -700,6 +721,19 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 
 // DbgMode returns the last decision's mode label (for tooling).
 func (b *Bot) DbgMode() string { return b.dbg }
+
+// ffaAtStart: rules that tell a free-for-all from a squad match before the first tick.
+func (b *Bot) ffaAtStart() bool {
+	switch b.P.FFA0 {
+	case "always":
+		return true
+	case "slot":
+		return b.slot != 0
+	case "seed":
+		return b.seed >= 1000000
+	}
+	return false
+}
 
 // probeStop: measurement builds go idle under a condition, so the score reveals
 // something about the matches the scorer runs.

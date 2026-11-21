@@ -243,6 +243,34 @@ func Variant(name string) Params {
 		p.PileBonus = 50
 	case "nolegacy":
 		p.NoLegacy = true
+	case "ffa0":
+		p.FFA0 = "always"
+	case "ffa0nograb":
+		p.FFA0 = "always"
+		p.Grab = 0
+		p.ScanFirst = false
+	case "ffa0noscan":
+		p.FFA0 = "always"
+		p.ScanFirst = false
+	case "ffa0grab70":
+		p.FFA0 = "always"
+		p.Grab = 70
+	case "noopen":
+		p.Open = false
+	case "openlas":
+		p.OpenBusyD = 0
+	case "openbusy":
+		p.NoOpenLas = true
+	case "open25":
+		p.OpenRatio = 2.5
+	case "ffa0open":
+		p.FFA0 = "always"
+	case "ffa0noopen":
+		p.FFA0 = "always"
+		p.Open = false
+	case "nograb":
+		p.Grab = 0
+		p.ScanFirst = false
 	case "sites":
 		p.Sites = true
 	case "sites2":
