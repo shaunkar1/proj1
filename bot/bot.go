@@ -47,6 +47,7 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	NoLasCheck      bool     // old behaviour: release the laser without checking the muzzle line
 	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
 	ChaseD          float64  // range held while chasing
 	PracStopKills   int      // measurement: go idle in practice after this many kills
