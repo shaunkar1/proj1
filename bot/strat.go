@@ -351,9 +351,9 @@ func (b *Bot) decide(act *proto.Action) {
 	// squad matches (and any match until another mech's death shows it is a
 	// free-for-all) run on the settings the scored practice build used, so that
 	// later free-for-all changes cannot move the practice score
-	b.E = effP{b.P.BossRatio, b.P.HardRatio, b.P.BossObjD, b.P.BossAvoidD, b.P.BossSeenD, b.P.PileBonus, b.P.ExploreOld, b.P.Calm, b.P.ObjHide}
+	b.E = effP{b.P.BossRatio, b.P.HardRatio, b.P.BossObjD, b.P.BossAvoidD, b.P.BossSeenD, b.P.PileBonus, b.P.ExploreOld, b.P.Calm, b.P.ObjHide, !b.P.NoWatchdog}
 	if !b.ffaSure && !b.P.NoLegacy {
-		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false}
+		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false, false}
 	}
 	b.boss = nil
 	b.peer = nil
@@ -747,6 +747,20 @@ func (b *Bot) decide(act *proto.Action) {
 		} else if ob != nil {
 			mode = ob.kind
 			goal, hasGoal = [2]float64{ob.pos[0], ob.pos[1]}, true
+			if b.E.Watchdog && ob.item != nil && (ob.kind == "roof" || ob.kind == "weapon") && b.climbID != ob.item.ID {
+				// in recorded matches we circled below a roof weapon for forty seconds:
+				// an item we stop getting closer to is dropped for a while
+				it := ob.item
+				b.dbgObj = it.ID
+				d := b.roughDist(ob.pos[0], ob.pos[1])
+				switch {
+				case it.wdT == 0 || d < it.wdD-5:
+					it.wdT, it.wdD = b.t, d
+				case b.t-it.wdT > 7:
+					it.Bad = b.t + 60
+					it.wdT = 0
+				}
+			}
 			switch ob.kind {
 			case "crate":
 				farm = ob.item

@@ -69,6 +69,7 @@ type Params struct {
 	PracStopKills   int     // measurement: go idle in practice after this many kills
 	Probe           string  // measurement runs (see probeStop)
 	Calm            bool    // a stronger mech in view that is not aiming at us and has not hit us lately does not send us to cover
+	NoWatchdog      bool    // keep walking at a weapon even when the distance to it stops shrinking
 	ObjHide         bool    // with a stronger mech around, only take on work it cannot see
 	Open            bool    // strike first with a ready laser, or at a mech busy with someone else
 	OpenRatio       float64 // ... unless it is this much stronger than us
@@ -209,6 +210,8 @@ type Item struct {
 	Seen float64
 	Roof bool
 	Bad  float64 // time until which we ignore it (unreachable)
+	wdT  float64 // last time we got closer to it while heading there (0: not yet)
+	wdD  float64 // closest we have been
 }
 
 type Bot struct {
@@ -304,6 +307,7 @@ type Bot struct {
 	seed          int64
 	peer          *Track
 	sawOtherDeath bool
+	dbgObj        int
 	grabID        int
 	grabT         float64
 	hop           *geo.Exit // jet hop in progress (or being walked to)
@@ -765,4 +769,5 @@ type effP struct {
 	ExploreOld                                                       bool
 	Calm                                                             bool
 	ObjHide                                                          bool
+	Watchdog                                                         bool
 }
