@@ -73,6 +73,10 @@ type Params struct {
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
+	Sites           bool     // walk to where mechs died (heard) to collect the cubes they dropped
+	SiteFar         float64  // distance assumed for a death heard in the far band
+	SiteFarVal      float64  // objective value of such a site
+	SiteTTL         float64  // forget a site after this many seconds
 	FixRange        float64  // fixed fighting distance in every mode (test stand-ins)
 	PracRange       float64  // fixed fighting distance in practice matches (0: choose by damage model)
 	Endgame         int      // free-for-all: with this many mechs left (but more than two), only fight back
@@ -100,7 +104,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 2.0, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 2.0, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 150, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -200,6 +204,7 @@ type Bot struct {
 	pickupL []*Item
 	crateL  []*Item
 	cubeL   []*Item
+	sites   []*deathSite
 
 	// nav
 	path     [][2]float64
@@ -599,6 +604,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 	// practice = everyone else is one squad: nobody dies unless we kill them
 	b.practice = !b.sawOtherDeath && o.T > 20
 	for _, s := range o.Sounds {
+		if s.Kind == "death" && b.P.Sites && !b.practice {
+			b.heardDeath(s.Bearing, s.Dist, o.T-s.Age)
+		}
 		if s.Dist == "near" && (s.Kind == "step" || s.Kind == "boost" || s.Kind == "jet" || s.Kind == "reload" || s.Kind == "laser_charge" || s.Kind == "lightning" || s.Kind == "gun") {
 			b.hearT = o.T - s.Age
 			b.hearDir = s.Bearing

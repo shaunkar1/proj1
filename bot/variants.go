@@ -132,6 +132,15 @@ func Variant(name string) Params {
 		p.EarlyAlive = 8
 	case "nobiter":
 		p.NoBiter = true
+	case "sites":
+		p.Sites = true
+	case "sites2":
+		p.Sites = true
+		p.SiteFarVal = 190
+		p.SiteFar = 280
+	case "sitesnear":
+		p.Sites = true
+		p.SiteFarVal = 0
 	case "snipe":
 		p.Snipe = 265
 	case "preempt":
