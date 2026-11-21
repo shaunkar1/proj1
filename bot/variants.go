@@ -140,6 +140,18 @@ func Variant(name string) Params {
 		p.BossRatio = 1.3
 	case "boss13":
 		p.BossRatio = 1.3
+	case "boss115":
+		p.BossRatio = 1.15
+	case "boss10":
+		p.BossRatio = 1.0
+	case "snb13":
+		p.Sites = true
+		p.SiteFarVal = 0
+		p.BossRatio = 1.3
+	case "snb115":
+		p.Sites = true
+		p.SiteFarVal = 0
+		p.BossRatio = 1.15
 	case "sites":
 		p.Sites = true
 	case "sites2":
