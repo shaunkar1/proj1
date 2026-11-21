@@ -76,6 +76,7 @@ type Params struct {
 	OpenHP          float64
 	OpenBusyD       float64
 	NoOpenLas       bool
+	RngSalt         int      // shifts the random stream (juke timing and the like)
 	FFA0            string   // start-of-match free-for-all test (see ffaAtStart)
 	Grab            float64  // weapon within this many metres is fetched before anything else (0 = off)
 	GrabCube        float64  // same for a cube this close
@@ -331,7 +332,7 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	if b.ffaAtStart() {
 		b.ffaSure, b.sawOtherDeath = true, true
 	}
-	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot)))
+	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot) + 104729*int64(p.RngSalt)))
 	b.tracks = map[int]*Track{}
 	b.pickups = map[int]*Item{}
 	b.crates = map[int]*Item{}
