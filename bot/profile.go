@@ -31,6 +31,8 @@ func ApplyProfile(p *Params, name string) {
 				p.GrabAlways = true
 			case m == "s":
 				p.ScanAlways = true
+			case m == "o":
+				p.QuietAlways = true
 			case m == "ul":
 				p.PracUpgradePrio = ltnFirst
 			case m == "ud":

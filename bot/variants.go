@@ -255,6 +255,24 @@ func Variant(name string) Params {
 	case "ffa0grab70":
 		p.FFA0 = "always"
 		p.Grab = 70
+	case "noquiet":
+		p.QuietT = 0
+	case "quiet75":
+		p.QuietT = 75
+	case "quiet30":
+		p.QuietT = 30
+	case "quiet0":
+		p.QuietAlways = true
+	case "quiet0t75":
+		p.QuietAlways = true
+		p.QuietT = 75
+	case "quiethide":
+		p.QuietHide = true
+		p.QuietObjD = 160
+	case "quiet160":
+		p.QuietObjD = 160
+	case "quiet80":
+		p.QuietObjD = 80
 	case "noffadrop":
 		p.FFADrop = 0
 	case "ffadropall":
