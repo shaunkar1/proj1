@@ -98,6 +98,7 @@ type Params struct {
 	BossFarD        float64 // free-for-all: an errand this far from the strongest mech is fine even if it is nearer to it than we are
 	NoBreak         bool    // no walking away from a spot we keep circling
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
+	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
@@ -802,6 +803,11 @@ func (b *Bot) DbgMode() string { return b.dbg }
 
 // ffaAtStart: rules that tell a free-for-all from a squad match before the first tick.
 func (b *Bot) ffaAtStart() bool {
+	if b.P.FFAAfter > 0 && b.wallOn {
+		if now := time.Now().Unix(); now > b.P.FFAAfter && now < b.P.FFAAfter+40*86400 {
+			return true
+		}
+	}
 	switch b.P.FFA0 {
 	case "always":
 		return true
