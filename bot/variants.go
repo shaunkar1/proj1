@@ -189,6 +189,20 @@ func Variant(name string) Params {
 		p.BossHot = 1.5
 	case "noroofbold":
 		p.RoofBold = false
+	case "tier15":
+		p.HardRatio = 1.5
+	case "tier13":
+		p.HardRatio = 1.3
+	case "tier18":
+		p.HardRatio = 1.8
+	case "tier15w":
+		p.HardRatio = 1.5
+		p.PeerAvoidD = 130
+		p.PeerObjD = 110
+	case "tier15n":
+		p.HardRatio = 1.5
+		p.PeerAvoidD = 60
+		p.PeerObjD = 45
 	case "sites":
 		p.Sites = true
 	case "sites2":
