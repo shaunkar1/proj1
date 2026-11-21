@@ -73,6 +73,7 @@ type Params struct {
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
+	BossHot         float64  // a mech that is hitting us only counts as one to avoid above this ratio (0: same as BossRatio)
 	IdleXUnarmed    bool     // with exploring on: only head for unseen ground while we hold no laser
 	Sites           bool     // walk to where mechs died (heard) to collect the cubes they dropped
 	SiteFar         float64  // distance assumed for a death heard in the far band

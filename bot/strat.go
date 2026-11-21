@@ -348,7 +348,14 @@ func (b *Bot) decide(act *proto.Action) {
 				continue
 			}
 			d := hyp(px, py, t.Pos[0], t.Pos[1])
-			if d < 300 && d < bossD && b.dangerRatio(t) > b.P.BossRatio {
+			if d < 300 && d < bossD {
+				dr := b.dangerRatio(t)
+				if dr <= b.P.BossRatio {
+					continue
+				}
+				if b.P.BossHot > 0 && dr < b.P.BossHot && b.t-t.HitMe < 4 {
+					continue // it is already on us and not much stronger: an answered fight beats a walk to cover
+				}
 				b.boss, bossD = t, d
 			}
 		}
