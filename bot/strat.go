@@ -1339,7 +1339,18 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 || b.t < it.Bad {
 			continue
 		}
-		consider(objective{kind: "cube", pos: it.Pos, value: 110, item: it})
+		v := 110.0
+		if b.P.PileBonus > 0 {
+			// a dead mech leaves a heap: the heap is the prize, not the nearest cube of it
+			n := 0
+			for _, o := range b.cubeL {
+				if o != it && b.t >= o.Bad && hyp(o.Pos[0], o.Pos[1], it.Pos[0], it.Pos[1]) < 14 {
+					n++
+				}
+			}
+			v += b.P.PileBonus * math.Min(float64(n), 6)
+		}
+		consider(objective{kind: "cube", pos: it.Pos, value: v, item: it})
 	}
 	if b.P.Sites && !b.practice {
 		b.tidySites()
