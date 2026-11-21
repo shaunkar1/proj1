@@ -338,7 +338,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 
-	b.farmPhase = b.P.PracFarmCubes > 0 && b.practice && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
+	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
 	// ---- someone far stronger than us nearby: keep out of its sight
 	b.boss = nil
 	bossD := 1e9
@@ -1095,7 +1095,11 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 		return b.t-t.HitMe < 4 || (b.t < t.Hostile && d < 70) || (t.HP < 0.3*t.MaxHP && d < 130 && hpFrac > 0.5)
 	}
 	if b.farmPhase {
-		return b.t-t.HitMe < 4 && d < 100
+		if b.practice {
+			return b.t-t.HitMe < 4 && d < 100
+		}
+		// not known to be a squad match (yet): answer whoever has hit us, at any range
+		return b.t < t.Hostile
 	}
 	if b.t < t.Hostile {
 		return true
@@ -1271,7 +1275,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
 			// repairing: only what is a few steps away and does not interrupt it -
 			// except a weapon while we have none worth the name
-			if !(b.P.RoofBold && (ob.kind == "weapon" || ob.kind == "roof") && d < 70 && !b.holds("laser")) {
+			if !(b.P.RoofBold && !b.practice && (ob.kind == "weapon" || ob.kind == "roof") && d < 70 && !b.holds("laser")) {
 				return
 			}
 		}
@@ -1340,7 +1344,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			h := it.Pos[2] - me.Pos[2]
 			need := h/8.0*me.Stats.JetDrain + 12
 			blocked := enemiesNear || hpFrac < 0.6
-			if b.P.RoofBold && !b.holds("laser") {
+			if b.P.RoofBold && !b.holds("laser") && !b.practice {
 				// a laser decides matches and many lie on low roofs: only an enemy that is
 				// actually close and looking, or fire we are taking, keeps us on the ground
 				blocked = hpFrac < 0.5 || b.t-b.lastDmgT < 3
@@ -1414,7 +1418,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
-	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !enemiesNear {
+	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !enemiesNear && !b.practice && b.t > 20 {
 		// no laser yet: looking over unseen ground competes with farming
 		if g, ok := b.unseenGoal(zEnd); ok {
 			v := 100.0
@@ -1449,7 +1453,7 @@ func (b *Bot) roam(zEnd zoneC) [2]float64 {
 	nv := b.w.Nav
 	best := [2]float64{zEnd.c[0], zEnd.c[1]}
 	bs := math.Inf(-1)
-	if !b.P.IdleXUnarmed || !b.holds("laser") {
+	if (!b.P.IdleXUnarmed || !b.holds("laser")) && !b.practice && b.t > 20 {
 		if g, ok := b.unseenGoal(zEnd); ok {
 			b.roamGoal = g
 			b.roamT = b.t + 12
