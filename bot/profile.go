@@ -33,6 +33,12 @@ func ApplyProfile(p *Params, name string) {
 				p.ScanAlways = true
 			case m == "o":
 				p.QuietAlways = true
+			case m == "o1":
+				p.QuietAlways, p.NoShyRoam0 = true, true
+			case m == "o2":
+				p.QuietAlways, p.NoShyRoam0, p.ShyNear0 = true, true, 70
+			case m == "o3":
+				p.QuietAlways, p.ShyNear0 = true, 70
 			case m == "ul":
 				p.PracUpgradePrio = ltnFirst
 			case m == "ud":

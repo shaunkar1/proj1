@@ -77,10 +77,19 @@ type Params struct {
 	OpenHP          float64
 	OpenBusyD       float64
 	NoOpenLas       bool
+	KeepAwayD       float64 // free-for-all: skip errands this close to a mech at least KeepAwayRatio as strong as us (0 = off)
+	KeepAwayRatio   float64
+	KeepAwayAlive   int     // ... while more than this many are alive
 	QuietT          float64 // free-for-all: for this long treat every mech as one to keep away from (0 = off)
 	QuietAlways     bool    // ... also before the match is known to be a free-for-all
 	QuietHide       bool    // quiet time also sends us to cover from anyone in view (else it only filters what we walk to)
 	QuietObjD       float64
+	ShyD            float64 // quiet time: no errand that closes to within this of a mech heard at short or middle range (0 = off)
+	ShyFarD         float64 // ... of one heard far away
+	ShyNear0        float64 // before the match is known to be a free-for-all, errands shorter than this are always allowed
+	ShyLaserD       float64 // a laser this near is fetched whoever was heard (never past a mech in view)
+	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
+	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
 	PracDropD       float64
@@ -144,7 +153,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, QuietT: 45, QuietObjD: 120, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 45, QuietObjD: 120, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -284,6 +293,9 @@ type Bot struct {
 	takeTryT      float64
 	hearT         float64
 	hearDir       float64
+	noise         []noiseSrc
+	shyGoal       [2]float64
+	shyT          float64
 	safeSpot      [2]float64
 	safeT         float64
 	roamGoal      [2]float64
@@ -672,6 +684,10 @@ func (b *Bot) perceive(o *proto.Obs) {
 		if s.Kind == "death" && b.P.Sites && !b.practice {
 			b.heardDeath(s.Bearing, s.Dist, o.T-s.Age)
 		}
+		switch s.Kind {
+		case "gun", "laser", "laser_charge", "lightning", "mortar", "reload", "boost", "jet", "step":
+			b.heardMech(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
+		}
 		if s.Dist == "near" && (s.Kind == "step" || s.Kind == "boost" || s.Kind == "jet" || s.Kind == "reload" || s.Kind == "laser_charge" || s.Kind == "lightning" || s.Kind == "gun") {
 			b.hearT = o.T - s.Age
 			b.hearDir = s.Bearing
@@ -789,4 +805,58 @@ type effP struct {
 	Calm                                                             bool
 	ObjHide                                                          bool
 	Watchdog                                                         bool
+}
+
+// noiseSrc is a place where a mech was heard (never seen): bearing is good to a few
+// degrees, distance only to a band.
+type noiseSrc struct {
+	pos [2]float64
+	t   float64
+	far bool
+}
+
+// heardMech notes where an unseen mech made a sound.
+func (b *Bot) heardMech(kind string, brg float64, band string, at float64) {
+	px, py := b.me.Pos[0], b.me.Pos[1]
+	rng := b.cfg.Sound.Range[kind]
+	if rng <= 0 {
+		rng = 200
+	}
+	near, mid := b.cfg.Sound.Near, b.cfg.Sound.Mid
+	if near <= 0 || mid <= near {
+		near, mid = 60, 160
+	}
+	var d float64
+	far := false
+	switch band {
+	case "near":
+		d = math.Min(near, rng) * 0.6
+	case "mid":
+		d = (near + math.Min(mid, math.Max(rng, near))) / 2
+	default:
+		d = (mid + math.Max(rng, mid)) / 2
+		far = true
+	}
+	// somebody we are looking at anyway?
+	for _, t := range b.tracks {
+		if t.NPC || t.Ghost || at-t.Seen > 2 {
+			continue
+		}
+		td := hyp(px, py, t.Pos[0], t.Pos[1])
+		if math.Abs(angDiff(math.Atan2(t.Pos[1]-py, t.Pos[0]-px), brg)) < 0.3 && td > d*0.5-20 && td < d*1.6+30 {
+			return
+		}
+	}
+	x, y := px+math.Cos(brg)*d, py+math.Sin(brg)*d
+	keep := b.noise[:0]
+	for _, n := range b.noise {
+		if at-n.t > 20 {
+			continue
+		}
+		if hyp(n.pos[0], n.pos[1], x, y) < 45 || (n.far && far && math.Abs(angDiff(math.Atan2(n.pos[1]-py, n.pos[0]-px), brg)) < 0.25) {
+			continue // the same one again: keep the newer fix
+		}
+		keep = append(keep, n)
+	}
+	b.noise = append(keep, noiseSrc{pos: [2]float64{x, y}, t: at, far: far})
 }

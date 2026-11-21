@@ -798,7 +798,12 @@ func (b *Bot) decide(act *proto.Action) {
 			ob = b.pickObjective(zEnd, hpFrac, len(mechs) > 0, budget)
 		}
 		b.nearOnly = false
-		if zoneGo && ob == nil {
+		if ob == nil && !hurt && b.quiet && b.P.ShyRoam && !b.P.QuietHide && (b.ffaSure || !b.P.NoShyRoam0) {
+			// early and nothing safe to do: the circle can wait, the crowd is in the middle
+			mode = "shy"
+			goal, hasGoal = b.shySpot(), true
+			ctx.arrive = 3
+		} else if zoneGo && ob == nil {
 			mode = "zone"
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 2
@@ -1460,8 +1465,24 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	px, py := me.Pos[0], me.Pos[1]
 	var best *objective
 	bs := 0.0
+	// mechs worth a detour: in recorded matches most of our deaths were even duels that began
+	// when an errand took us within 60 m of somebody as strong as we were
+	var keep []*Track
+	if b.P.KeepAwayD > 0 && b.ffaSure && !b.practice && !b.quiet && b.o.Alive > b.P.KeepAwayAlive {
+		for _, t := range b.trackL {
+			if !t.NPC && !t.Ghost && b.t-t.Seen < 8 && b.dangerRatio(t) >= b.P.KeepAwayRatio {
+				keep = append(keep, t)
+			}
+		}
+	}
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
+		for _, t := range keep {
+			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
+				return
+			}
+		}
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
 			// repairing: only what is a few steps away and does not interrupt it -
 			// except a weapon while we have none worth the name
@@ -1479,12 +1500,34 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.quiet && !b.P.QuietHide {
 			// do the work that does not take us toward anybody
 			for _, t := range b.trackL {
+				if !b.ffaSure && d <= b.P.ShyNear0 {
+					break
+				}
 				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
 					continue
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 				if db < b.P.QuietObjD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
 					return
+				}
+			}
+			wantLas := (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && d <= b.P.ShyLaserD
+			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas {
+				// ... nor toward anybody heard: on average we walked 66 m toward the mech that
+				// then hit us first, and it had started 200 m away
+				for i := range b.noise {
+					n := &b.noise[i]
+					if b.t-n.t > 12 {
+						continue
+					}
+					lim := b.P.ShyD
+					if n.far {
+						lim = b.P.ShyFarD
+					}
+					db := hyp(ob.pos[0], ob.pos[1], n.pos[0], n.pos[1])
+					if db < lim && db < hyp(px, py, n.pos[0], n.pos[1])-8 {
+						return
+					}
 				}
 			}
 		}
@@ -1668,6 +1711,57 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		b.lastObjKind, b.lastObjPos = best.kind, best.pos
 	}
 	return best
+}
+
+// shySpot is where to idle early on: as far as can be had from everybody seen or heard.
+func (b *Bot) shySpot() [2]float64 {
+	me := b.me
+	px, py := me.Pos[0], me.Pos[1]
+	if b.t < b.shyT {
+		return b.shyGoal
+	}
+	b.shyT = b.t + 2.5
+	var oth [][2]float64
+	for _, t := range b.trackL {
+		if !t.NPC && !t.Ghost && b.t-t.Seen < 12 {
+			oth = append(oth, [2]float64{t.Pos[0], t.Pos[1]})
+		}
+	}
+	for i := range b.noise {
+		if b.t-b.noise[i].t < 12 {
+			oth = append(oth, b.noise[i].pos)
+		}
+	}
+	b.shyGoal = [2]float64{px, py}
+	if len(oth) == 0 {
+		return b.shyGoal
+	}
+	score := func(x, y float64) float64 {
+		m := 260.0
+		for _, o := range oth {
+			if d := hyp(x, y, o[0], o[1]); d < m {
+				m = d
+			}
+		}
+		return m
+	}
+	zs := b.zoneAt(b.t + 25)
+	nv := b.w.Nav
+	bs := score(px, py) + 12
+	for ring := 1; ring <= 3; ring++ {
+		r := 30 * float64(ring)
+		for k := 0; k < 12; k++ {
+			a := float64(k) * math.Pi / 6
+			x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+			if !nv.WalkableMain(x, y) || zs.outside(x, y) > -12 {
+				continue
+			}
+			if s := score(x, y) - 0.12*r; s > bs {
+				bs, b.shyGoal = s, [2]float64{x, y}
+			}
+		}
+	}
+	return b.shyGoal
 }
 
 // roam wanders inside the next circle, preferring spots away from the centre.
