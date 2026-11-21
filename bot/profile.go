@@ -27,6 +27,8 @@ func ApplyProfile(p *Params, name string) {
 			}
 			v, _ := strconv.ParseFloat(m[1:], 64)
 			switch {
+			case m == "lk":
+				p.LtnKite = true
 			case m == "pk":
 				p.PracNoPeek = false
 			case m == "ff":
