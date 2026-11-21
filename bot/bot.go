@@ -78,6 +78,7 @@ type Params struct {
 	FFA0            string   // start-of-match free-for-all test (see ffaAtStart)
 	Grab            float64  // weapon within this many metres is fetched before anything else (0 = off)
 	GrabAlways      bool     // also before the match is known to be a free-for-all
+	ScanAlways      bool     // ... also before the match is known to be a free-for-all
 	ScanFirst       bool     // finish the first look around before shooting crates
 	PracLtnRank     float64  // squad matches: value of lightning as a second weapon (0: the usual rank; laser is 3)
 	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
@@ -130,7 +131,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }

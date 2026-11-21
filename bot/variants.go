@@ -267,7 +267,7 @@ func Variant(name string) Params {
 	case "noopen":
 		p.Open = false
 	case "openlas":
-		p.OpenBusyD = 0
+		p.NoOpenLas = false
 	case "openbusy":
 		p.NoOpenLas = true
 	case "open25":

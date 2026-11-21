@@ -1115,7 +1115,7 @@ func (b *Bot) decide(act *proto.Action) {
 				}
 			}
 		}
-		look := b.P.ScanFirst && b.t < 1.7 && (b.ffaSure || b.P.GrabAlways)
+		look := b.P.ScanFirst && b.t < 1.7 && (b.ffaSure || b.P.ScanAlways)
 		if !shot && farm != nil && !look {
 			shot = b.shootCrate(act, farm)
 		}

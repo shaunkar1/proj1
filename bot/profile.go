@@ -1,5 +1,10 @@
 package bot
 
+import (
+	"strconv"
+	"strings"
+)
+
 // Profile selects the squad-match (practice) tuning compiled into the bot.
 const Profile = "base"
 
@@ -10,6 +15,35 @@ func ApplyProfile(p *Params, name string) {
 		p.Probe = name[6:]
 		name = "f75a220"
 	}
+	var mods []string
+	if i := strings.IndexByte(name, '+'); i >= 0 {
+		mods = strings.Split(name[i+1:], "+")
+		name = name[:i]
+	}
+	defer func() {
+		for _, m := range mods {
+			if m == "" {
+				continue
+			}
+			v, _ := strconv.ParseFloat(m[1:], 64)
+			switch {
+			case m == "g":
+				p.GrabAlways = true
+			case m == "s":
+				p.ScanAlways = true
+			case m[0] == 't':
+				p.PracFarmT = v
+			case m[0] == 'c':
+				p.PracFarmCubes = int(v)
+			case m[0] == 'a':
+				p.PracAggroD = v
+			case m[0] == 'h':
+				p.PracAggroHP = v / 100
+			case m[0] == 'r':
+				p.PracRetreatHP = v / 100
+			}
+		}
+	}()
 	switch name {
 	case "base":
 	case "aggro":
