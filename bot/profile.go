@@ -69,6 +69,16 @@ func ApplyProfile(p *Params, name string) {
 	case "probe1", "probe2", "probe3", "probe4", "probe5", "probe6":
 		p.PracAggro = true
 		p.PracStopKills = int(name[5] - '0')
+	case "kite200":
+		p.PracAggro = true
+		p.PracBerserk = true
+		p.PracRetreatHP = 0
+		p.PracRange = 200
+	case "kite150":
+		p.PracAggro = true
+		p.PracBerserk = true
+		p.PracRetreatHP = 0
+		p.PracRange = 150
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220

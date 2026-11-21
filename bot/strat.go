@@ -516,6 +516,11 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.strafe = true
 		ctx.wantLOS = 1
+		chase := b.P.ChaseHP > 0 && tgt.HP < b.P.ChaseHP*tgt.MaxHP && hpFrac > 0.5 && nHostile <= 1 && tgt.HP < me.HP
+		if chase && prefD > b.P.ChaseD {
+			// wounded and alone: stay on it so it cannot break off and repair
+			prefD = b.P.ChaseD
+		}
 		ctx.pref = prefD
 		for i := range threats {
 			if threats[i].t == tgt {
@@ -533,6 +538,9 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		if prefD > d+25 && me.Energy > 30 {
 			ctx.boost = true // open the range back up
+		}
+		if chase && d > prefD+15 && me.Energy > 35 {
+			ctx.boost = true
 		}
 		if zoneGo {
 			// drift toward the zone while fighting
