@@ -285,6 +285,16 @@ func Variant(name string) Params {
 		p.ShyRoam = false
 	case "shy0":
 		p.QuietAlways = true
+	case "shy0soft":
+		p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 0.8
+	case "shy0soft2":
+		p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 1.6
+	case "shy0o5":
+		p.QuietAlways, p.ShyWeapon0, p.NoShyRoam0 = true, true, true
+	case "shy0o4":
+		p.QuietAlways, p.ShyWeapon0 = true, true
+	case "shy0o1":
+		p.QuietAlways, p.NoShyRoam0 = true, true
 	case "shy0n12":
 		p.QuietAlways = true
 		p.ShyNear0 = 12
