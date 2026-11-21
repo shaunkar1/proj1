@@ -277,7 +277,12 @@ func Variant(name string) Params {
 	case "ffa0noopen":
 		p.FFA0 = "always"
 		p.Open = false
+	case "nograbcube":
+		p.GrabCube = 0
+	case "grabcube28":
+		p.GrabCube = 28
 	case "nograb":
+		p.GrabCube = 0
 		p.Grab = 0
 		p.ScanFirst = false
 	case "sites":

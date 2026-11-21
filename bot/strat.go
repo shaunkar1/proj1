@@ -579,6 +579,29 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 			gd, grab = d, it
 		}
+		if grab == nil && b.P.GrabCube > 0 {
+			// a cube a few steps away is health and damage for good: two seconds well spent
+			gd = b.P.GrabCube
+			for _, it := range b.cubeL {
+				if b.t < it.Bad || math.Abs(it.Pos[2]-me.Pos[2]) > 3 {
+					continue
+				}
+				d := hyp(px, py, it.Pos[0], it.Pos[1])
+				if d >= gd {
+					continue
+				}
+				near := false
+				for _, t := range mechs {
+					if hyp(it.Pos[0], it.Pos[1], t.Pos[0], t.Pos[1]) < 25 && b.t-t.Seen < 2 {
+						near = true
+					}
+				}
+				if near || b.roughDist(it.Pos[0], it.Pos[1]) > b.P.GrabCube*1.5 {
+					continue
+				}
+				gd, grab = d, it
+			}
+		}
 	}
 	switch {
 	case zoneUrgent:
@@ -601,7 +624,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		if b.grabID != grab.ID {
 			b.grabID, b.grabT = grab.ID, b.t
-		} else if b.t-b.grabT > 7 {
+		} else if b.t-b.grabT > 6 {
 			grab.Bad = b.t + 60
 		}
 	case ghost != nil && b.t-ghost.HitMe < 2.5 && (tgt == nil || !tgt.LOS || (b.P.EvadeSniper && b.ffaSure && ghost.has[2] && !finishing && !b.practice)):
