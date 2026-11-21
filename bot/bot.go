@@ -88,6 +88,7 @@ type Params struct {
 	ShyFarD         float64 // ... of one heard far away
 	ShyNear0        float64 // before the match is known to be a free-for-all, errands shorter than this are always allowed
 	ShyLaserD       float64 // a laser this near is fetched whoever was heard (never past a mech in view)
+	ShyWeapon0      bool    // ... and so is every walk to a weapon
 	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
