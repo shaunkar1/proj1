@@ -1064,6 +1064,10 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 	if b.isPrey(t, d, hpFrac) {
 		return true
 	}
+	if b.isBlind(t, d, hpFrac) {
+		t.Hostile = math.Max(t.Hostile, b.t+6)
+		return true
+	}
 	if b.practice && b.P.PracBerserk {
 		return true
 	}
@@ -1530,6 +1534,35 @@ func (b *Bot) dangerRatio(t *Track) float64 {
 	theirs := thp * b.enemyDps(t, 90)
 	ours := b.me.HP * math.Max(b.myDps(t, 90), 25)
 	return theirs / math.Max(ours, 1)
+}
+
+// isBlind: openers. Recorded showdowns: whoever lands the first hit wins 70% of
+// early duels, and the leading bots open on mechs that are not looking at them.
+//
+//	Ambush  - target inside this range is looking away (first beam is free, and on its rear)
+//	Snipe   - target has no laser of its own and is far enough that its gun is weak
+//	Preempt - any near-equal target inside this range
+func (b *Bot) isBlind(t *Track, d, hpFrac float64) bool {
+	if b.P.Ambush <= 0 && b.P.Snipe <= 0 && b.P.Preempt <= 0 {
+		return false
+	}
+	if b.practice || t.NPC || t.Ghost || b.boss != nil || hpFrac < 0.6 || !t.LOS || b.t-t.Seen > 0.3 || !b.holds("laser") {
+		return false
+	}
+	dr := b.dangerRatio(t)
+	if b.P.Ambush > 0 && d > 50 && d < b.P.Ambush && dr <= b.P.AmbushRatio {
+		brg := math.Atan2(b.me.Pos[1]-t.Pos[1], b.me.Pos[0]-t.Pos[0])
+		if math.Abs(angDiff(t.Aim[0], brg)) > b.P.AmbushAng {
+			return true
+		}
+	}
+	if b.P.Snipe > 0 && !t.has[2] && d > 110 && d < b.P.Snipe && dr <= 1.5 {
+		return true
+	}
+	if b.P.Preempt > 0 && d > 60 && d < b.P.Preempt && dr <= 1.1 {
+		return true
+	}
+	return false
 }
 
 // isPrey: a mech we clearly outclass (kills are the main source of cubes).
