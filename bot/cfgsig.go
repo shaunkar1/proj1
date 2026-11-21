@@ -73,3 +73,6 @@ func cfgDiff(raw []byte) (first, n int) {
 
 // CfgDiffX is cfgDiff for tools.
 func CfgDiffX(raw []byte) (int, int) { return cfgDiff(raw) }
+
+// FFASureX reports whether the bot has decided this is a free-for-all (for tools).
+func (b *Bot) FFASureX() bool { return b.ffaSure }

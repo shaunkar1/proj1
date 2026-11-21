@@ -97,6 +97,7 @@ type Params struct {
 	QuietNoAim      bool    // quiet time (free-for-all known): being looked at is no reason to open fire, only a charging laser or a hit is
 	BossFarD        float64 // free-for-all: an errand this far from the strongest mech is fine even if it is nearer to it than we are
 	NoBreak         bool    // no walking away from a spot we keep circling
+	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
@@ -161,7 +162,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 45, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -700,7 +701,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 	if o.Alive < b.prevAlive {
 		b.prevAlive = o.Alive
 	}
-	if !b.ffaSure && b.wallMed > 0 && b.ffaByClock() {
+	if !b.ffaSure && b.wallOn && b.P.FFA0 != "" && o.T < 2 && b.ffaByClock() {
 		b.ffaSure, b.sawOtherDeath = true, true
 	}
 	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
@@ -817,6 +818,12 @@ func (b *Bot) ffaByClock() bool {
 	if len(b.P.FFA0) > 4 && b.P.FFA0[:4] == "wall" {
 		if v, err := strconv.Atoi(b.P.FFA0[4:]); err == nil {
 			return b.wallMed > float64(v)
+		}
+	}
+	if len(b.P.FFA0) > 3 && b.P.FFA0[:3] == "gap" {
+		// the first observation came long after we were ready: the server was waiting for other teams' bots
+		if v, err := strconv.Atoi(b.P.FFA0[3:]); err == nil {
+			return b.readyGap > float64(v)
 		}
 	}
 	return false
