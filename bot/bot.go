@@ -67,6 +67,7 @@ type Params struct {
 	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
 	ChaseD          float64  // range held while chasing
 	PracStopKills   int      // measurement: go idle in practice after this many kills
+	PracLtnRank     float64  // squad matches: value of lightning as a second weapon (0: the usual rank; laser is 3)
 	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
 	AmbushAng       float64  // how far off us its aim must be (rad)
 	AmbushRatio     float64  // skip targets more dangerous than this ratio

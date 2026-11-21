@@ -196,7 +196,15 @@ func (b *Bot) heldRank(w *proto.WeaponObs) float64 {
 		}
 		return 99
 	}
-	return b.P.WeaponRank[w.Kind]
+	return b.rank(w.Kind)
+}
+
+// rank is how much we value a weapon kind (squad matches may value lightning differently).
+func (b *Bot) rank(kind string) float64 {
+	if b.practice && b.P.PracLtnRank > 0 && kind == "lightning" {
+		return b.P.PracLtnRank
+	}
+	return b.P.WeaponRank[kind]
 }
 
 func (b *Bot) slot1Rank() float64 {
@@ -222,7 +230,7 @@ func (b *Bot) wantPickup(it *Item) float64 {
 	if it.Kind == "gun" || b.holds(it.Kind) {
 		return 0
 	}
-	v := b.P.WeaponRank[it.Kind] - b.slot1Rank()
+	v := b.rank(it.Kind) - b.slot1Rank()
 	if it.Kind == "lightning" && b.slot1Rank() == 0.5 {
 		v = 1.2 // lightning in place of the gun, next to a laser
 	}
