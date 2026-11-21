@@ -224,6 +224,8 @@ func Variant(name string) Params {
 	case "evsner12":
 		p.EvadeSniper = true
 		p.EngageRatio = 1.2
+	case "exold":
+		p.ExploreOld = true
 	case "sites":
 		p.Sites = true
 	case "sites2":

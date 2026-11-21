@@ -1444,7 +1444,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
-	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !enemiesNear && !b.practice && b.t > 20 {
+	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !b.practice && (b.P.ExploreOld && !enemiesNear && b.t > 20 || !b.P.ExploreOld && !b.dangerClose()) {
 		// no laser yet: looking over unseen ground competes with farming
 		if g, ok := b.unseenGoal(zEnd); ok {
 			v := 100.0
@@ -1636,6 +1636,23 @@ func (b *Bot) dangerRatio(t *Track) float64 {
 	theirs := thp * b.enemyDps(t, 90)
 	ours := b.me.HP * math.Max(b.myDps(t, 90), 25)
 	return theirs / math.Max(ours, 1)
+}
+
+// dangerClose: an enemy that matters right now - close, and either hostile or with a line on us.
+func (b *Bot) dangerClose() bool {
+	if b.t-b.lastDmgT < 3 {
+		return true
+	}
+	px, py := b.me.Pos[0], b.me.Pos[1]
+	for _, t := range b.trackL {
+		if t.NPC || t.Ghost || b.t-t.Seen > 3 {
+			continue
+		}
+		if hyp(px, py, t.Pos[0], t.Pos[1]) < 110 && (b.t < t.Hostile || t.LOS) {
+			return true
+		}
+	}
+	return false
 }
 
 // isBlind: openers. Recorded showdowns: whoever lands the first hit wins 70% of
