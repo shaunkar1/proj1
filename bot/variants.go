@@ -69,6 +69,22 @@ func Variant(name string) Params {
 	case "lasltnnm":
 		p.DropGunForLtn = true
 		p.WeaponRank = map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}
+	case "atlike":
+		// stand-in for the laser+lightning chasers seen in showdowns
+		p.Aggressive = true
+		p.DropGunForLtn = true
+		p.HuntAfter = 0
+		p.FixRange = 40
+		p.RetreatHP = 0.15
+		p.EngageRatio = 3
+		p.NoPeek = true
+	case "atgun":
+		p.Aggressive = true
+		p.HuntAfter = 0
+		p.FixRange = 60
+		p.RetreatHP = 0.15
+		p.EngageRatio = 3
+		p.NoPeek = true
 	case "survivor":
 		p.Endgame = 16
 		p.HuntPassive = false

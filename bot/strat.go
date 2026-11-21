@@ -144,6 +144,10 @@ func (b *Bot) gunHitProb(t *Track, d float64) float64 {
 
 // bestRange picks the fighting distance where our damage most outweighs theirs.
 func (b *Bot) bestRange(t *Track) (float64, float64) {
+	if b.P.FixRange > 0 && !t.NPC {
+		d := b.P.FixRange
+		return d, b.myDps(t, d) - 1.15*b.enemyDps(t, d)
+	}
 	if b.practice && b.P.PracRange > 0 && !t.NPC {
 		d := b.P.PracRange
 		return d, b.myDps(t, d) - 1.15*b.enemyDps(t, d)
