@@ -197,6 +197,7 @@ func handle(ln []byte, pilot **bot.Bot, send func([]byte)) {
 	if err := json.Unmarshal(ln, &h); err != nil || h.Type != "hello" {
 		return
 	}
+	h.Raw = append([]byte(nil), ln...)
 	t0 := time.Now()
 	var w *geo.World
 	var err error
