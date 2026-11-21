@@ -54,6 +54,12 @@ func (b *Bot) enemyDps(t *Track, d float64) float64 {
 		return 0
 	}
 	mul := b.cubeMul(t.Cubes) * (1 - b.me.Stats.Armor)
+	// every upgrade threshold it has passed probably went partly into firepower
+	for _, th := range b.cfg.Cubes.UpgradeThresholds {
+		if t.Cubes >= th {
+			mul *= 1.07
+		}
+	}
 	dps := 0.0
 	known := t.has[0] || t.has[1] || t.has[2] || t.has[3]
 	if t.has[0] || !known {
