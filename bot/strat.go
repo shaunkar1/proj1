@@ -1423,10 +1423,12 @@ func (b *Bot) roam(zEnd zoneC) [2]float64 {
 	nv := b.w.Nav
 	best := [2]float64{zEnd.c[0], zEnd.c[1]}
 	bs := math.Inf(-1)
-	if g, ok := b.unseenGoal(zEnd); ok {
-		b.roamGoal = g
-		b.roamT = b.t + 12
-		return g
+	if !b.P.IdleXUnarmed || !b.holds("laser") {
+		if g, ok := b.unseenGoal(zEnd); ok {
+			b.roamGoal = g
+			b.roamT = b.t + 12
+			return g
+		}
 	}
 	for k := 0; k < 24; k++ {
 		a := b.rng.Float64() * 2 * math.Pi
