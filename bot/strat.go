@@ -341,14 +341,16 @@ func (b *Bot) decide(act *proto.Action) {
 	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
 	// ---- someone far stronger than us nearby: keep out of its sight
 	b.boss = nil
+	b.peer = nil
 	bossD := 1e9
+	peerD := 1e9
 	if b.P.BossRatio > 0 && !b.practice && o.Alive > 2 {
 		for _, t := range b.trackL {
 			if t.NPC || t.Ghost || b.t-t.Seen > 15 {
 				continue
 			}
 			d := hyp(px, py, t.Pos[0], t.Pos[1])
-			if d < 300 && d < bossD {
+			if d < 300 {
 				dr := b.dangerRatio(t)
 				if dr <= b.P.BossRatio {
 					continue
@@ -356,7 +358,16 @@ func (b *Bot) decide(act *proto.Action) {
 				if b.P.BossHot > 0 && dr < b.P.BossHot && b.t-t.HitMe < 4 {
 					continue // it is already on us and not much stronger: an answered fight beats a walk to cover
 				}
-				b.boss, bossD = t, d
+				if b.P.HardRatio > 0 && dr <= b.P.HardRatio {
+					// about our strength: give it room, but it does not empty the neighbourhood
+					if d < peerD {
+						b.peer, peerD = t, d
+					}
+					continue
+				}
+				if d < bossD {
+					b.boss, bossD = t, d
+				}
 			}
 		}
 		if b.boss != nil {
@@ -537,6 +548,15 @@ func (b *Bot) decide(act *proto.Action) {
 		goal, hasGoal = sp, true
 		ctx.hide = true
 		ctx.boost = me.Energy > 10
+		ctx.wGoal = 1.5
+		ctx.mustMove = true
+	case boss == nil && b.peer != nil && peerD < b.P.PeerAvoidD && b.peer.LOS && b.t-b.peer.Seen < 1.5 && !(tgt == b.peer && finishing) && tgt != b.peer:
+		// an equal looking our way from close: step out of its line, keep what we were doing nearby
+		mode = "avoid"
+		sp := b.findSafe(threats)
+		goal, hasGoal = sp, true
+		ctx.hide = true
+		ctx.target = tgt
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
 	case boss != nil && (bossD < 150 || (boss.LOS && b.t-boss.Seen < 1.5)) && !(tgt == boss && finishing):
@@ -1283,6 +1303,12 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			// nothing is worth walking toward the strongest mech around
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
 			if db < 160 || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
+				return
+			}
+		}
+		if pe := b.peer; pe != nil && b.t-pe.Seen < 8 {
+			db := hyp(ob.pos[0], ob.pos[1], pe.Pos[0], pe.Pos[1])
+			if db < b.P.PeerObjD || db < d-10 {
 				return
 			}
 		}

@@ -166,6 +166,7 @@ func Variant(name string) Params {
 		p.BossRatio = 0.85
 	case "b7":
 		// previous defaults
+		p.HardRatio = 0
 		p.BossRatio = 2.0
 		p.Sites = false
 		p.NoExplore = true
@@ -189,6 +190,35 @@ func Variant(name string) Params {
 		p.BossHot = 1.5
 	case "noroofbold":
 		p.RoofBold = false
+	case "tier15":
+		p.HardRatio = 1.5
+	case "tier13":
+		p.HardRatio = 1.3
+	case "tier18":
+		p.HardRatio = 1.8
+	case "tier15w":
+		p.HardRatio = 1.5
+		p.PeerAvoidD = 130
+		p.PeerObjD = 110
+	case "tier15n":
+		p.HardRatio = 1.5
+		p.PeerAvoidD = 60
+		p.PeerObjD = 45
+	case "b12":
+		p.HardRatio = 0
+	case "er12":
+		p.EngageRatio = 1.2
+	case "er14":
+		p.EngageRatio = 1.4
+	case "er08":
+		p.EngageRatio = 0.8
+	case "hard13":
+		p.HardRatio = 1.3
+	case "hard20":
+		p.HardRatio = 2.0
+	case "nopeer":
+		p.BossRatio = 1.5
+		p.HardRatio = 0
 	case "sites":
 		p.Sites = true
 	case "sites2":
