@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 
+	"mechbot/geo"
 	"mechbot/proto"
 )
 
@@ -491,6 +492,51 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.goal = &goal
 	}
 
+	// ---- enclosed pocket (stadium bowl, courtyard): walk to the cheapest jet hop out
+	nvw := b.w.Nav
+	if myc := nvw.Cell(px, py); b.hopFly || (myc >= 0 && nvw.Walk[myc] && nvw.Comp[myc] != nvw.Main && me.Grounded) {
+		if !b.hopFly {
+			exits := nvw.Exits[nvw.Comp[myc]]
+			var be *geo.Exit
+			bc := math.Inf(1)
+			for i := range exits {
+				e := &exits[i]
+				d := hyp(e.LX, e.LY, px, py)
+				// prefer exits that lead toward where we want to be
+				toward := 0.0
+				if hasGoal {
+					toward = hyp(e.TX, e.TY, goal[0], goal[1]) * 0.25
+				}
+				c := d*1.4 + e.Energy*1.2 + toward
+				if b.hop != nil && e.LX == b.hop.LX && e.LY == b.hop.LY {
+					c -= 25 // stick with the current choice
+				}
+				if b.t < b.hopFail && b.hop != nil && e.LX == b.hop.LX && e.LY == b.hop.LY {
+					c += 400
+				}
+				if c < bc {
+					bc, be = c, e
+				}
+			}
+			b.hop = be
+		}
+		if b.hop != nil && mode != "fight" {
+			mode = "escape"
+			goal, hasGoal = [2]float64{b.hop.LX, b.hop.LY}, true
+			ctx.goal = &goal
+			ctx.arrive = 0.8
+			ctx.mustMove = false
+			ctx.wGoal = 3
+			ctx.boost = false
+			if !b.hopFly && hyp(b.hop.LX, b.hop.LY, px, py) < 1.8 && me.Grounded && me.Energy >= math.Min(b.hop.Energy+10, me.MaxEnergy*0.97) {
+				b.hopFly = true
+				b.hopT = b.t
+			}
+		}
+	} else if !b.hopFly {
+		b.hop = nil
+	}
+
 	// ---- unstick
 	spd := math.Hypot(me.Vel[0], me.Vel[1])
 	moved := hyp(px, py, b.lastPos[0], b.lastPos[1])
@@ -502,7 +548,34 @@ func (b *Bot) decide(act *proto.Action) {
 	var mx, my float64
 	var boost bool
 	climbing := false
-	if b.climbID >= 0 {
+	if b.hopFly && b.hop != nil {
+		// flight controller: stay above everything still between us and the landing point
+		e := b.hop
+		dx, dy := e.TX-px, e.TY-py
+		l := math.Max(math.Hypot(dx, dy), 0.01)
+		ahead := b.w.MaxTopAlong(px, py, e.TX, e.TY)
+		landed := me.Grounded && b.t-b.hopT > 0.4
+		switch {
+		case landed && (nvw.WalkableMain(px, py) || l < 3):
+			b.hopFly, b.hop = false, nil
+		case landed || b.t-b.hopT > 14:
+			// came down short: try again (elsewhere if it keeps failing)
+			b.hopFly = false
+			b.hopFail = b.t + 25
+		default:
+			climbing = true
+			mx, my = dx/l, dy/l
+			if me.Grounded {
+				act.Jump = true
+			}
+			boost = me.Pos[2] < ahead+1.5 && l > 2.0
+			if l <= 2.0 {
+				mx, my = 0, 0
+			}
+			mode = "hop"
+		}
+	}
+	if !climbing && b.climbID >= 0 {
 		it := b.pickups[b.climbID]
 		onRoof := me.Grounded && math.Abs(me.Pos[2]-b.climbPos[2]) < 1.6
 		switch {

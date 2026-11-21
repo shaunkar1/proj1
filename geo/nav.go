@@ -13,11 +13,12 @@ type Nav struct {
 	MinX   float64
 	MinY   float64
 	Walk   []bool
-	Hgt    []float32 // walking surface height
-	Cost   []float32 // extra cost for hugging obstacles
-	Adj    []uint8   // bit k set: the step to neighbour k is walkable
-	Comp   []int32   // connected component id (-1 blocked)
-	Main   int32     // id of the largest component
+	Hgt    []float32        // walking surface height
+	Cost   []float32        // extra cost for hugging obstacles
+	Adj    []uint8          // bit k set: the step to neighbour k is walkable
+	Comp   []int32          // connected component id (-1 blocked)
+	Main   int32            // id of the largest component
+	Exits  map[int32][]Exit // ways out of enclosed areas, by component
 	g      []float32
 	stamp  []uint32
 	closed []uint32
@@ -215,6 +216,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 	}
 	nv.Main = best
 	w.Nav = nv
+	w.buildExits(15, 8.5, 82)
 }
 
 var nbrs = [8][2]int{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}
@@ -246,6 +248,132 @@ func (nv *Nav) stepOK(a, b int) bool {
 		}
 	}
 	return false
+}
+
+// Exit is a jet hop out of an enclosed area: stand at L, rise above H, fly to T.
+type Exit struct {
+	LX, LY, TX, TY float64
+	H              float64 // altitude to clear
+	Energy         float64 // rough energy cost
+}
+
+// MaxTopAlong returns the highest surface (terrain or prism) on the segment.
+func (w *World) MaxTopAlong(ax, ay, bx, by float64) float64 {
+	l := math.Hypot(bx-ax, by-ay)
+	n := int(l) + 1
+	m := math.Inf(-1)
+	for i := 0; i <= n; i++ {
+		t := float64(i) / float64(n)
+		if h := w.TopAt(ax+(bx-ax)*t, ay+(by-ay)*t); h > m {
+			m = h
+		}
+	}
+	return m
+}
+
+// buildExits finds jet hops from every enclosed walkable pocket to open ground.
+func (w *World) buildExits(jetDrain, riseSpeed, maxEnergy float64) {
+	nv := w.Nav
+	nv.Exits = map[int32][]Exit{}
+	size := map[int32]int{}
+	for c := range nv.Walk {
+		if nv.Walk[c] && nv.Comp[c] != nv.Main {
+			size[nv.Comp[c]]++
+		}
+	}
+	type key struct {
+		comp   int32
+		gx, gy int
+	}
+	best := map[key]Exit{}
+	for c := range nv.Walk {
+		if !nv.Walk[c] || nv.Comp[c] == nv.Main || size[nv.Comp[c]] < 12 {
+			continue
+		}
+		x, y := nv.Pos(c)
+		hL := float64(nv.Hgt[c])
+		for k := 0; k < 16; k++ {
+			a := float64(k) * math.Pi / 8
+			dx, dy := math.Cos(a), math.Sin(a)
+			top := hL
+			for d := 2.0; d <= 76; d += 2 {
+				px, py := x+dx*d, y+dy*d
+				if !w.InBounds(px, py) {
+					break
+				}
+				if t := w.TopAt(px, py); t > top {
+					top = t
+				}
+				if t := w.TopAt(px-dy*2.6, py+dx*2.6); t > top {
+					top = t
+				}
+				if t := w.TopAt(px+dy*2.6, py-dx*2.6); t > top {
+					top = t
+				}
+				tc := nv.Cell(px, py)
+				if tc < 0 || !nv.Walk[tc] || nv.Comp[tc] != nv.Main {
+					continue
+				}
+				climb := top + 1.5 - hL
+				if climb < 0 {
+					climb = 0
+				}
+				e := jetDrain*(climb/riseSpeed+d/9*0.7) + 6
+				if e > maxEnergy {
+					break
+				}
+				kk := key{nv.Comp[c], int(math.Floor(x / 10)), int(math.Floor(y / 10))}
+				if old, ok := best[kk]; !ok || e < old.Energy {
+					best[kk] = Exit{x, y, px, py, top + 1.5, e}
+				}
+				break
+			}
+		}
+	}
+	for kk, e := range best {
+		nv.Exits[kk.comp] = append(nv.Exits[kk.comp], e)
+	}
+}
+
+// NearestIn returns the closest walkable cell of component comp (any
+// component if comp < 0) within maxR metres, or -1.
+func (nv *Nav) NearestIn(x, y, maxR float64, comp int32) int {
+	ok := func(c int) bool { return nv.Walk[c] && (comp < 0 || nv.Comp[c] == comp) }
+	c := nv.Cell(x, y)
+	if c >= 0 && ok(c) {
+		return c
+	}
+	ci := int(math.Floor((x-nv.MinX)/NavStep + 0.5))
+	cj := int(math.Floor((y-nv.MinY)/NavStep + 0.5))
+	best, bd := -1, math.Inf(1)
+	rr := int(maxR/NavStep) + 1
+	for r := 1; r <= rr; r++ {
+		for dj := -r; dj <= r; dj++ {
+			for di := -r; di <= r; di++ {
+				if di != -r && di != r && dj != -r && dj != r {
+					continue
+				}
+				ni, nj := ci+di, cj+dj
+				if ni < 0 || nj < 0 || ni >= nv.W || nj >= nv.H {
+					continue
+				}
+				nc := nj*nv.W + ni
+				if !ok(nc) {
+					continue
+				}
+				px, py := nv.Pos(nc)
+				d := (px-x)*(px-x) + (py-y)*(py-y)
+				if d < bd {
+					bd = d
+					best = nc
+				}
+			}
+		}
+		if best >= 0 && float64(r)*NavStep > math.Sqrt(bd) {
+			break
+		}
+	}
+	return best
 }
 
 func (nv *Nav) Cell(x, y float64) int {
@@ -335,9 +463,17 @@ func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 // (cell centres) and the path cost in metres; nil if unreachable.
 // extra, if non-nil, adds a per-cell cost (danger fields).
 func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) float32) ([][2]float64, float64) {
-	s := nv.Nearest(sx, sy, 40)
-	g := nv.Nearest(gx, gy, 40)
-	if s < 0 || g < 0 {
+	// start from where we actually stand (even inside an enclosed pocket) and
+	// aim for the closest point of that same area to the goal
+	s := nv.NearestIn(sx, sy, 6, -1)
+	if s < 0 {
+		s = nv.Nearest(sx, sy, 40)
+	}
+	if s < 0 {
+		return nil, 0
+	}
+	g := nv.NearestIn(gx, gy, 40, nv.Comp[s])
+	if g < 0 {
 		return nil, 0
 	}
 	if s == g {

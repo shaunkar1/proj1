@@ -188,6 +188,10 @@ type Bot struct {
 	blockedC   map[int]float64
 	objID      int
 	objT       float64
+	hop        *geo.Exit // jet hop in progress (or being walked to)
+	hopFly     bool
+	hopT       float64
+	hopFail    float64
 	climbID    int
 	climbT     float64
 	climbPos   [3]float64
