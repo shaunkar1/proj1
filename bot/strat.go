@@ -355,7 +355,7 @@ func (b *Bot) decide(act *proto.Action) {
 	if !b.ffaSure && !b.P.NoLegacy {
 		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false, false}
 	}
-	if b.P.QuietT > 0 && b.t < b.P.QuietT && (b.ffaSure || b.P.QuietAlways) && !b.practice {
+	if b.P.QuietT > 0 && b.t < b.P.QuietT && (b.ffaSure || (b.P.QuietAlways && (b.P.ShyT0 <= 0 || b.t < b.P.ShyT0))) && !b.practice {
 		// recorded matches: mechs that stayed out of every exchange for the first 75 s finished
 		// 5th on average, those drawn in within 15 s finished 9th-10th - and they started just as
 		// close to their neighbours. Early on, keep away from everyone and out of their sight.

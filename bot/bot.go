@@ -90,6 +90,7 @@ type Params struct {
 	ShyLaserD       float64 // a laser this near is fetched whoever was heard (never past a mech in view)
 	ShyWeapon0      bool    // ... and so is every walk to a weapon
 	ShySoft0        float64 // > 0: before the free-for-all is known the filter only costs points (this many per metre closed) instead of forbidding
+	ShyT0           float64 // > 0: quiet time before the free-for-all is known ends this early
 	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64

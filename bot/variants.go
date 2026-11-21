@@ -11,7 +11,7 @@ func Variant(name string) Params {
 	p.Name = name
 	if strings.HasPrefix(name, "tk") {
 		// short names for practice-profile tickets, for job files
-		m := map[string]string{"tk0": "", "tko": "+o", "tko1": "+o1", "tko2": "+o2", "tko4": "+o4", "tko5": "+o5", "tko6": "+o6", "tko7": "+o7", "tko8": "+o8", "tko9": "+o9"}
+		m := map[string]string{"tk0": "", "tko": "+o", "tko1": "+o1", "tko2": "+o2", "tko4": "+o4", "tko5": "+o5", "tko6": "+o6", "tko7": "+o7", "tko8": "+o8", "tko9": "+o9", "tko10": "+o10", "tko11": "+o11", "tko12": "+o12"}
 		if suf, ok := m[name]; ok {
 			p = baseParams()
 			p.Name = name
@@ -295,6 +295,12 @@ func Variant(name string) Params {
 		p.QuietAlways, p.ShyWeapon0 = true, true
 	case "shy0o1":
 		p.QuietAlways, p.NoShyRoam0 = true, true
+	case "shy0t8":
+		p.QuietAlways, p.ShyT0 = true, 8
+	case "shy0t12":
+		p.QuietAlways, p.ShyT0 = true, 12
+	case "shy0t12w":
+		p.QuietAlways, p.ShyT0, p.ShyWeapon0 = true, 12, true
 	case "shy0n12":
 		p.QuietAlways = true
 		p.ShyNear0 = 12

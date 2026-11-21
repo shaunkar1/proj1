@@ -45,6 +45,12 @@ func ApplyProfile(p *Params, name string) {
 				p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 0.8
 			case m == "o9":
 				p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 1.6
+			case m == "o10":
+				p.QuietAlways, p.ShyT0 = true, 8
+			case m == "o11":
+				p.QuietAlways, p.ShyT0 = true, 12
+			case m == "o12":
+				p.QuietAlways, p.ShyT0, p.ShyWeapon0 = true, 12, true
 			case m == "o1":
 				p.QuietAlways, p.NoShyRoam0 = true, true
 			case m == "o2":
