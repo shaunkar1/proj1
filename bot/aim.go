@@ -279,7 +279,8 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	if las != nil {
 		full := las.Stats.Charge
 		charging := las.Charge > 0
-		y, p, _ := b.aimAt(b.predict(t, latency))
+		lp, lok, ltight := b.laserPoint(t, hgt)
+		y, p, _ := b.aimAt(lp)
 		inRange := d < las.Stats.Range-5
 		if charging {
 			act.Fire[li] = true
@@ -289,7 +290,11 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 				cmd = [2]float64{y, p}
 				an := b.aimNext(cmd, 1)
 				ey, ep := aimErr(an, y, p)
-				if ey < tolY*0.8 && ep < tolP*0.8 {
+				lp2 := tolP * 0.8
+				if ltight {
+					lp2 = math.Atan2(hgt*0.1, d)
+				}
+				if lok && ey < tolY*0.8 && ep < lp2 {
 					act.Fire[li] = false // release: fires
 				}
 				shot = true
@@ -349,4 +354,23 @@ func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 		}
 	}
 	return true
+}
+
+// laserPoint picks where on a mech to put the beam: its centre when the line
+// from our muzzle is open, otherwise a higher or lower part that is. The eye
+// seeing the target does not mean the muzzle has a line (ridges, roof edges,
+// and a muzzle that rises as we grow).
+func (b *Bot) laserPoint(t *Track, hgt float64) (pt [3]float64, ok, tight bool) {
+	pt = b.predict(t, latency)
+	if b.P.NoLasCheck || b.w.Clear(b.muz[0], b.muz[1], b.muz[2], pt[0], pt[1], pt[2]) {
+		return pt, true, false
+	}
+	for _, f := range [...]float64{0.85, 0.68, 0.3, 0.12} {
+		q := pt
+		q[2] = t.Pos[2] + hgt*f
+		if b.w.Clear(b.muz[0], b.muz[1], b.muz[2], q[0], q[1], q[2]) {
+			return q, true, true
+		}
+	}
+	return pt, false, false
 }

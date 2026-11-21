@@ -571,8 +571,26 @@ func (b *Bot) decide(act *proto.Action) {
 				farm = ob.item
 				ctx.arrive = 14
 				cp := [3]float64{ob.item.Pos[0], ob.item.Pos[1], ob.item.Pos[2] + 1.2}
+				// closer than this the gun cannot be depressed onto it
+				minD := (me.Stats.MuzzleHeight-1.2+me.Pos[2]-ob.item.Pos[2])/math.Tan(math.Max(0.2, -me.Stats.MinPitch*0.85)) + 1.5
+				if minD < 8 {
+					minD = 8
+				}
+				ctx.arrive = math.Max(14, minD+5)
 				if !b.w.Clear(b.muz[0], b.muz[1], b.muz[2], cp[0], cp[1], cp[2]) {
-					ctx.arrive = 3 // no line on it from here: walk up to it
+					ctx.arrive = minD + 1 // no line on it from here: walk up to it
+				}
+				if dC := hyp(px, py, cp[0], cp[1]); dC < minD {
+					ux, uy := b.lastMove[0], b.lastMove[1]
+					if dC > 0.5 {
+						ux, uy = (px-cp[0])/dC, (py-cp[1])/dC
+					}
+					if ux == 0 && uy == 0 {
+						ux = 1
+					}
+					goal = [2]float64{cp[0] + ux*(minD+4), cp[1] + uy*(minD+4)}
+					ctx.arrive = 1
+					ctx.mustMove = true
 				}
 				if b.objID != ob.item.ID {
 					b.objID, b.objT = ob.item.ID, b.t
@@ -814,6 +832,7 @@ func (b *Bot) decide(act *proto.Action) {
 		shot = true
 	}
 	healing := hpFrac < 0.85 && b.t-b.lastDmgT < 40
+	farmShot := false
 	if !shot && shootT == nil && healing {
 		// keep still on the trigger: dealing damage restarts the repair timer
 		for _, t := range b.trackL {
@@ -855,6 +874,7 @@ func (b *Bot) decide(act *proto.Action) {
 				shot = b.shootCrate(act, bc)
 			}
 		}
+		farmShot = shot
 	}
 	if las, li := b.weapon("laser"); las != nil && las.Charge > 0 && !act.Fire[li] && shootT == nil && !b.lasCrate {
 		act.Fire[li] = true // never let go without a target
@@ -864,7 +884,8 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	// reload when quiet
 	if gun, _ := b.weapon("gun"); gun != nil && gun.Reload <= 0 && gun.Ammo < gun.Stats.Mag {
-		quiet := shootT == nil && (tgt == nil || !tgt.LOS)
+		// (a crate or drone under fire is not quiet: reloading after every round made farming crawl)
+		quiet := shootT == nil && (tgt == nil || !tgt.LOS) && !farmShot
 		if (quiet && gun.Ammo <= gun.Stats.Mag*0.5) || (quiet && tgt == nil && len(mechs) == 0 && gun.Ammo < gun.Stats.Mag) {
 			act.Reload = true
 		}
