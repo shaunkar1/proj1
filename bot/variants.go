@@ -269,6 +269,18 @@ func Variant(name string) Params {
 		p.NoLegacy = true
 	case "ffa0":
 		p.FFA0 = "always"
+	case "ffa0old":
+		p.FFA0 = "always"
+		p.EndgameFFA, p.QuietCap = 0, 240
+	case "ffa0e":
+		p.FFA0 = "always"
+		p.QuietCap = 240
+	case "ffa0c":
+		p.FFA0 = "always"
+		p.EndgameFFA = 0
+	case "ffa0e6":
+		p.FFA0 = "always"
+		p.EndgameFFA = 6
 	case "ffa0nograb":
 		p.FFA0 = "always"
 		p.Grab = 0

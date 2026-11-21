@@ -406,6 +406,9 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	boss := b.boss
 	b.patient = b.P.Endgame > 0 && b.sawOtherDeath && o.Alive <= b.P.Endgame && o.Alive > 2
+	if b.P.EndgameFFA > 0 && b.ffaSure && b.othersDied > 0 && o.Alive <= b.P.EndgameFFA && o.Alive > 2 {
+		b.patient = true
+	}
 	// ---- target choice
 	var tgt *Track
 	bestV := -1e18
