@@ -95,6 +95,8 @@ type Params struct {
 	ShyMove0        bool    // ... and with nothing to do we walk on, away from everybody, over unseen ground, instead of standing
 	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
 	QuietNoAim      bool    // quiet time (free-for-all known): being looked at is no reason to open fire, only a charging laser or a hit is
+	BossFarD        float64 // free-for-all: an errand this far from the strongest mech is fine even if it is nearer to it than we are
+	NoBreak         bool    // no walking away from a spot we keep circling
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
@@ -159,7 +161,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 45, QuietObjD: 120, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 45, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -238,6 +240,7 @@ type Item struct {
 	Bad  float64 // time until which we ignore it (unreachable)
 	wdT  float64 // last time we got closer to it while heading there (0: not yet)
 	wdD  float64 // closest we have been
+	wdHP float64 // its hit points then (crates)
 }
 
 type Bot struct {
@@ -302,6 +305,12 @@ type Bot struct {
 	noise         []noiseSrc
 	shyGoal       [2]float64
 	shyT          float64
+	dithAt        [2]float64 // where the current 12 m circle was entered, when, and the ground covered inside it
+	dithT         float64
+	dithPath      float64
+	dithPrev      [2]float64
+	breakT        float64 // walking out of a spot we kept circling
+	breakG        [2]float64
 	cfgFirst      int // hello differs from the kit's: first section, and how many (see cfgDiff)
 	cfgN          int
 	wallOn        bool // running under the real server: observation arrival times are kept
@@ -688,6 +697,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 	if o.Alive < b.prevAlive {
 		b.prevAlive = o.Alive
 	}
+	if !b.ffaSure && b.wallMed > 0 && b.ffaByClock() {
+		b.ffaSure, b.sawOtherDeath = true, true
+	}
 	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
 	if b.othersDied > 0 {
 		b.sawOtherDeath = true
@@ -794,6 +806,16 @@ func (b *Bot) ffaAtStart() bool {
 	return false
 }
 
+// ffaByClock: the match is a free-for-all because the server waits on other teams' bots between ticks.
+func (b *Bot) ffaByClock() bool {
+	if len(b.P.FFA0) > 4 && b.P.FFA0[:4] == "wall" {
+		if v, err := strconv.Atoi(b.P.FFA0[4:]); err == nil {
+			return b.wallMed > float64(v)
+		}
+	}
+	return false
+}
+
 // probeStop: measurement builds go idle under a condition, so the score reveals
 // something about the matches the scorer runs.
 func (b *Bot) probeStop() bool {
@@ -801,6 +823,12 @@ func (b *Bot) probeStop() bool {
 		// stop at a set time: the score is then the kills made by that time
 		if v, err := strconv.Atoi(b.P.Probe[1:]); err == nil {
 			return b.t >= float64(v)
+		}
+	}
+	if len(b.P.Probe) > 2 && b.P.Probe[:2] == "dt" {
+		// stop when the server ticks slower than this many milliseconds
+		if v, err := strconv.Atoi(b.P.Probe[2:]); err == nil {
+			return b.wallMed > float64(v)
 		}
 	}
 	switch b.P.Probe {
