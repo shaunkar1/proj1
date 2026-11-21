@@ -790,6 +790,10 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 0.6
 		}
+	case b.E.Watchdog && !b.P.NoBreak && b.t < b.breakT && !b.practice:
+		mode = "break"
+		goal, hasGoal = b.breakG, true
+		ctx.arrive = 8
 	default:
 		ob := (*objective)(nil)
 		hurt := hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0
@@ -822,6 +826,18 @@ func (b *Bot) decide(act *proto.Action) {
 		} else if ob != nil {
 			mode = ob.kind
 			goal, hasGoal = [2]float64{ob.pos[0], ob.pos[1]}, true
+			if b.E.Watchdog && ob.item != nil && (ob.kind == "crate" || ob.kind == "cube") {
+				// a recorded match: 48 s of walking back and forth 18 m from a crate we never reached
+				it := ob.item
+				d := b.roughDist(ob.pos[0], ob.pos[1])
+				switch {
+				case it.wdT == 0 || d < it.wdD-5 || it.HP < it.wdHP-1 || b.t-it.wdT > 40:
+					it.wdT, it.wdD, it.wdHP = b.t, d, it.HP
+				case b.t-it.wdT > 12:
+					it.Bad = b.t + 45
+					it.wdT = 0
+				}
+			}
 			if b.E.Watchdog && ob.item != nil && (ob.kind == "roof" || ob.kind == "weapon") && b.climbID != ob.item.ID {
 				// in recorded matches we circled below a roof weapon for forty seconds:
 				// an item we stop getting closer to is dropped for a while
@@ -935,6 +951,49 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	b.mode = mode
+	if b.E.Watchdog && !b.practice {
+		// a recorded match: 48 s of boosting to and fro inside ten metres with a crate and a weapon close by.
+		// Lots of ground covered without leaving a small circle, on an errand: walk away from it.
+		if b.dithT == 0 || hyp(px, py, b.dithAt[0], b.dithAt[1]) > 12 {
+			b.dithAt, b.dithT, b.dithPath = [2]float64{px, py}, b.t, 0
+		} else {
+			switch mode {
+			case "crate", "cube", "weapon", "roof", "explore", "roam", "npcgo", "site", "hunt", "drop", "zone":
+				b.dithPath += hyp(px, py, b.dithPrev[0], b.dithPrev[1])
+			}
+		}
+		b.dithPrev = [2]float64{px, py}
+		if !b.P.NoBreak && b.t-b.dithT > 14 && b.dithPath > 45 && b.t >= b.breakT {
+			best, bd := [2]float64{zEnd.c[0], zEnd.c[1]}, math.Inf(1)
+			nv := b.w.Nav
+			for k := 0; k < 12; k++ {
+				a := float64(k) * math.Pi / 6
+				x, y := px+90*math.Cos(a), py+90*math.Sin(a)
+				if !nv.WalkableMain(x, y) || zEnd.outside(x, y) > -15 {
+					continue
+				}
+				c := hyp(x, y, zEnd.c[0], zEnd.c[1])
+				if bo := b.boss; bo != nil && hyp(x, y, bo.Pos[0], bo.Pos[1]) < 120 {
+					c += 300
+				}
+				if c < bd {
+					bd, best = c, [2]float64{x, y}
+				}
+			}
+			b.breakG, b.breakT = best, b.t+9
+			b.dithT = 0
+			for _, it := range b.crateL {
+				if hyp(it.Pos[0], it.Pos[1], px, py) < 45 {
+					it.Bad = math.Max(it.Bad, b.t+40)
+				}
+			}
+			for _, it := range b.pickupL {
+				if hyp(it.Pos[0], it.Pos[1], px, py) < 45 {
+					it.Bad = math.Max(it.Bad, b.t+40)
+				}
+			}
+		}
+	}
 	if hasGoal {
 		ctx.goal = &goal
 	}
@@ -1498,7 +1557,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if bo := b.boss; bo != nil {
 			// nothing is worth walking toward the strongest mech around
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
-			if db < b.E.BossObjD || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
+			if db < b.E.BossObjD || (db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 && (!b.ffaSure || b.P.BossFarD <= 0 || db < b.P.BossFarD)) {
 				return
 			}
 		}
