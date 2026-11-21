@@ -40,5 +40,5 @@ func (b *Bot) trace(act interface{}) {
 
 // Info describes the last decision (for profiling tools).
 func (b *Bot) Info() string {
-	return fmt.Sprintf("mode=%s search=%v pathlen=%d tracks=%d proj=%d", b.mode, b.searchTick == b.o.Tick, len(b.path), len(b.tracks), len(b.o.Projectiles))
+	return fmt.Sprintf("mode=%s search=%v pathlen=%d tracks=%d proj=%d", b.mode, b.searchTick == b.o.Tick, len(b.path), len(b.tracks)*1000+b.dbgObj%1000, len(b.o.Projectiles))
 }
