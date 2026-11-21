@@ -141,7 +141,13 @@ func main() {
 			return
 		case "obs":
 			var o proto.Obs
-			if err := json.Unmarshal(newest, &o); err != nil {
+			err := json.Unmarshal(newest, &o)
+			if _, typeErr := err.(*json.UnmarshalTypeError); typeErr && o.Type == "obs" && len(o.Self.Weapons) > 0 {
+				// one field had an unexpected type; the rest decoded, so carry on with it
+				logf("odd field in obs: %v", err)
+				err = nil
+			}
+			if err != nil {
 				// never lose the tick over one odd field: answer with the last action
 				logf("bad obs: %v", err)
 				var tk struct {
