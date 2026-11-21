@@ -337,6 +337,28 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 
 	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
+	// ---- someone far stronger than us nearby: keep out of its sight
+	b.boss = nil
+	bossD := 1e9
+	if b.P.BossRatio > 0 && !b.practice && o.Alive > 2 {
+		for _, t := range b.trackL {
+			if t.NPC || t.Ghost || b.t-t.Seen > 15 {
+				continue
+			}
+			d := hyp(px, py, t.Pos[0], t.Pos[1])
+			if d < 300 && d < bossD && b.dangerRatio(t) > b.P.BossRatio {
+				b.boss, bossD = t, d
+			}
+		}
+		if b.boss != nil {
+			for i := range threats {
+				if threats[i].t == b.boss && threats[i].weight < 2 {
+					threats[i].weight = 2
+				}
+			}
+		}
+	}
+	boss := b.boss
 	b.patient = b.P.Endgame > 0 && b.sawOtherDeath && o.Alive <= b.P.Endgame && o.Alive > 2
 	// ---- target choice
 	var tgt *Track
@@ -503,6 +525,16 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.boost = me.Energy > 10
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
+	case boss != nil && (bossD < 210 || boss.LOS) && !(tgt == boss && finishing):
+		// outclassed: break its line and open the distance; shoot only if it costs nothing
+		mode = "avoid"
+		sp := b.findSafe(threats)
+		goal, hasGoal = sp, true
+		ctx.hide = true
+		ctx.boost = me.Energy > 12 && boss.LOS && b.t-boss.Seen < 1 && bossD < 170
+		ctx.target = tgt
+		ctx.wGoal = 1.5
+		ctx.mustMove = boss.LOS && b.t-boss.Seen < 1
 	case b.retreating || (tgt != nil && !engage && (underFire || incoming > 0)):
 		mode = "retreat"
 		sp := b.findSafe(threats)
@@ -614,6 +646,8 @@ func (b *Bot) decide(act *proto.Action) {
 				if hyp(goal[0], goal[1], px, py) < 30 {
 					ctx.boost = false // arrive with a full tank
 				}
+			case "explore":
+				ctx.arrive = 20
 			case "hunt":
 				ctx.arrive = 30
 			case "drop":
@@ -742,6 +776,21 @@ func (b *Bot) decide(act *proto.Action) {
 				boost = me.Pos[2] < b.climbPos[2]+1.0
 			}
 			mode = "climb"
+		}
+	}
+	if b.P.Periscope > 0 && b.t < 3.4 && !climbing && !b.hopFly && !underFire && tgt == nil && mode != "zone" {
+		// opening look: hop up on the jets and turn once, to see weapons and crates over the rooftops
+		if b.t < 0.15 {
+			b.periZ = me.Pos[2]
+		}
+		if (me.Grounded && b.t < 1.2) || (!me.Grounded && b.t < 3.0) {
+			mx, my = 0, 0
+			climbing = true
+			mode = "peri"
+			if me.Grounded {
+				act.Jump = true
+			}
+			boost = !me.Grounded && me.Pos[2] < b.periZ+b.P.Periscope && me.Energy > 45 && b.t < 2.4
 		}
 	}
 	if climbing {
@@ -1015,6 +1064,13 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	bs := 0.0
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
+		if bo := b.boss; bo != nil {
+			// nothing is worth walking toward the strongest mech around
+			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
+			if db < 160 || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
+				return
+			}
+		}
 		// reachable before the zone takes it?
 		eta := b.t + d/me.Stats.WalkSpeed
 		if b.zoneAt(eta+3).outside(ob.pos[0], ob.pos[1]) > -5 {
@@ -1055,6 +1111,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		val := 70 + 45*v
 		if b.slot1Rank() == 0 {
 			val = 200 + 30*v // a second weapon decides fights: get one first
+		}
+		if it.Kind == "laser" && !b.P.NoLaserRush {
+			val = math.Max(val, 270) // every match we won, we held a laser early
 		}
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 {
 			// on a roof: climb for it when it is reachable and nobody is around
@@ -1106,6 +1165,16 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
+	if !b.P.NoLaserRush && !b.P.NoExplore && !b.holds("laser") && !enemiesNear {
+		// no laser yet: looking over unseen ground competes with farming
+		if g, ok := b.unseenGoal(zEnd); ok {
+			v := 100.0
+			if b.slot1Rank() == 0 {
+				v = 125
+			}
+			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: v})
+		}
+	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
 		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro)) {
@@ -1131,6 +1200,11 @@ func (b *Bot) roam(zEnd zoneC) [2]float64 {
 	nv := b.w.Nav
 	best := [2]float64{zEnd.c[0], zEnd.c[1]}
 	bs := math.Inf(-1)
+	if g, ok := b.unseenGoal(zEnd); ok {
+		b.roamGoal = g
+		b.roamT = b.t + 12
+		return g
+	}
 	for k := 0; k < 24; k++ {
 		a := b.rng.Float64() * 2 * math.Pi
 		r := zEnd.r * (0.25 + 0.6*b.rng.Float64())
@@ -1156,7 +1230,7 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		base = math.Atan2(act.Move[1], act.Move[0])
 	}
 	switch {
-	case b.t < 1.7:
+	case b.t < 1.7 || (b.P.Periscope > 0 && b.t < 3.3 && !me.Grounded):
 		// first look: one full turn to find weapons and crates nearby
 		act.Aim = [2]float64{angDiff(b.spawnYaw+me.Stats.TurnRate*(b.t+0.3), 0), 0}
 		return
@@ -1167,7 +1241,118 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		act.Aim = [2]float64{b.hearDir, 0}
 		return
 	}
+	if b.P.SpinScan {
+		// keep turning: every direction gets a look about every two seconds
+		act.Aim = [2]float64{angDiff(me.Aim[0]+0.36, 0), 0}
+		return
+	}
 	b.scanPhase += 0.1
 	off := math.Sin(b.scanPhase*1.1) * 1.9
 	act.Aim = [2]float64{angDiff(base+off, 0), 0}
+}
+
+const seenCell = 20.0
+
+// markSeen records which patches of ground are in view right now.
+func (b *Bot) markSeen() {
+	w := b.w
+	if b.seen == nil {
+		b.seenW = int((w.BMaxX-w.BMinX)/seenCell) + 1
+		b.seenH = int((w.BMaxY-w.BMinY)/seenCell) + 1
+		b.seen = make([]bool, b.seenW*b.seenH)
+	}
+	me := b.me
+	px, py := me.Pos[0], me.Pos[1]
+	ez := me.Pos[2] + me.Stats.EyeHeight
+	rng := b.cfg.Vision.Range - 15
+	if rng < 60 {
+		rng = 160
+	}
+	half := b.cfg.Vision.FovDeg * math.Pi / 360
+	if half <= 0 {
+		half = math.Pi / 3
+	}
+	// a handful of rays per decision keeps this cheap; the torso sweep does the rest
+	for k := 0; k < 10; k++ {
+		a := me.Aim[0] + (b.rng.Float64()*2-1)*half*0.95
+		r := 30 + b.rng.Float64()*(rng-30)
+		x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+		cx, cy := int((x-w.BMinX)/seenCell), int((y-w.BMinY)/seenCell)
+		if cx < 0 || cy < 0 || cx >= b.seenW || cy >= b.seenH || b.seen[cy*b.seenW+cx] {
+			continue
+		}
+		gx := w.BMinX + (float64(cx)+0.5)*seenCell
+		gy := w.BMinY + (float64(cy)+0.5)*seenCell
+		if hyp(gx, gy, px, py) > rng {
+			continue
+		}
+		if w.Sees(px, py, ez, gx, gy, w.Ground(gx, gy)+1.5) {
+			b.seen[cy*b.seenW+cx] = true
+		}
+	}
+}
+
+// unseenGoal is the best patch of ground we have not looked at yet inside the
+// next circle: weapons and crates are only known once seen.
+func (b *Bot) unseenGoal(zEnd zoneC) ([2]float64, bool) {
+	var best [2]float64
+	if b.P.NoExplore || len(b.seen) == 0 {
+		return best, false
+	}
+	if b.t < b.unseenT {
+		cx, cy := int((b.unseenG[0]-b.w.BMinX)/seenCell), int((b.unseenG[1]-b.w.BMinY)/seenCell)
+		if cx >= 0 && cy >= 0 && cx < b.seenW && cy < b.seenH && !b.seen[cy*b.seenW+cx] && zEnd.outside(b.unseenG[0], b.unseenG[1]) < -10 {
+			return b.unseenG, true
+		}
+	}
+	me := b.me
+	nv := b.w.Nav
+	w := b.w
+	bs := math.Inf(-1)
+	for cy := 0; cy < b.seenH; cy++ {
+		for cx := 0; cx < b.seenW; cx++ {
+			if b.seen[cy*b.seenW+cx] {
+				continue
+			}
+			x := w.BMinX + (float64(cx)+0.5)*seenCell
+			y := w.BMinY + (float64(cy)+0.5)*seenCell
+			if zEnd.outside(x, y) > -10 || !nv.WalkableMain(x, y) {
+				continue
+			}
+			d := hyp(x, y, me.Pos[0], me.Pos[1])
+			if d < 25 {
+				b.seen[cy*b.seenW+cx] = true // standing on it
+				continue
+			}
+			// prefer near, and patches whose neighbours are unseen too
+			un := 0
+			for _, o := range [...][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				nx, ny := cx+o[0], cy+o[1]
+				if nx >= 0 && ny >= 0 && nx < b.seenW && ny < b.seenH && !b.seen[ny*b.seenW+nx] {
+					un++
+				}
+			}
+			s := -d + float64(un)*12
+			if s > bs {
+				bs, best = s, [2]float64{x, y}
+			}
+		}
+	}
+	if bs == math.Inf(-1) {
+		return best, false
+	}
+	b.unseenG, b.unseenT = best, b.t+6
+	return best, true
+}
+
+// dangerRatio compares what a mech could do to us with what we could do to it
+// in a straight fight at medium range (health times damage rate, theirs over ours).
+func (b *Bot) dangerRatio(t *Track) float64 {
+	thp := t.HP
+	if thp <= 0 {
+		thp = t.MaxHP
+	}
+	theirs := thp * b.enemyDps(t, 90)
+	ours := b.me.HP * math.Max(b.myDps(t, 90), 25)
+	return theirs / math.Max(ours, 1)
 }
