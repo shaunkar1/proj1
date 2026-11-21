@@ -72,6 +72,7 @@ type Params struct {
 	AmbushRatio     float64  // skip targets more dangerous than this ratio
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
+	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
 	FixRange        float64  // fixed fighting distance in every mode (test stand-ins)
 	PracRange       float64  // fixed fighting distance in practice matches (0: choose by damage model)
 	Endgame         int      // free-for-all: with this many mechs left (but more than two), only fight back
