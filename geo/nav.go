@@ -63,7 +63,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			y := nv.MinY + float64(j)*NavStep
 			c := j*nv.W + i
 			rc := w.cell(x, y)
-			if rc < 0 || !w.InBounds(x, y) {
+			if rc < 0 || !w.InBounds(x-1.5, y-1.5) || !w.InBounds(x+1.5, y+1.5) {
 				continue
 			}
 			h := float64(w.H[rc])
@@ -83,7 +83,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 					}
 					px, py := x+float64(di), y+float64(dj)
 					pc := w.cell(px, py)
-					if pc < 0 || !w.InBounds(px, py) {
+					if pc < 0 {
 						ok = false
 						break scan
 					}

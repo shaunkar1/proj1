@@ -32,6 +32,7 @@ type World struct {
 	CanopyDensity float64
 	CanopyBlockT  float64
 	MaxTop        float32
+	margin        float64
 	Nav           *Nav
 }
 
@@ -233,6 +234,16 @@ func (w *World) cell(x, y float64) int {
 		return -1
 	}
 	return j*w.NX + i
+}
+
+// SetMargin shrinks the playable area: the arena wall stands this far inside
+// the map bounds (config match.arena_margin). Call before BuildNav.
+func (w *World) SetMargin(m float64) {
+	w.BMinX += m - w.margin
+	w.BMaxX -= m - w.margin
+	w.BMinY += m - w.margin
+	w.BMaxY -= m - w.margin
+	w.margin = m
 }
 
 func (w *World) InBounds(x, y float64) bool {

@@ -68,6 +68,10 @@ type Mech struct {
 	DmgLog   []DmgRec
 	Shots    int
 	Hits     int
+	FirstW   float64 // time the first extra weapon was taken (-1: never)
+	FirstLas float64
+	Cubes60  int
+	Cubes120 int
 }
 
 type DmgRec struct {
@@ -371,7 +375,7 @@ func New(w *geo.World, base *proto.Hello, seed int64, mk func(slot int, hello *p
 		}
 	}
 	for i := 0; i < n; i++ {
-		m := &Mech{ID: i, Alive: true, upCount: map[string]int{}, memory: map[int]float64{}, lastDmg: -100, lastSpnd: -100, lastHit: -1}
+		m := &Mech{ID: i, Alive: true, upCount: map[string]int{}, memory: map[int]float64{}, lastDmg: -100, lastSpnd: -100, lastHit: -1, FirstW: -1, FirstLas: -1}
 		m.Pos = [3]float64{pts[i][0], pts[i][1], w.Ground(pts[i][0], pts[i][1])}
 		m.Grounded = true
 		m.Aim[0] = math.Atan2(s.zc[1]-m.Pos[1], s.zc[0]-m.Pos[0])

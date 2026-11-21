@@ -47,6 +47,9 @@ type result struct {
 	dealt, taken, zone float64
 	name               string
 	shots, hits        int
+	fw, fl             float64
+	c60, c120          int
+	alive60            bool
 }
 
 func loadHello(path string) *proto.Hello {
@@ -93,6 +96,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	w0.SetMargin(base.Config.Match.ArenaMargin)
 	w0.BuildNav(3.0, 9.5, 1.2)
 	cands := strings.Split(*cand, ",")
 
@@ -217,7 +221,7 @@ func main() {
 					if !ok {
 						continue
 					}
-					r := result{place: m.Place, kills: m.Kills, deathT: m.DeathT, cubes: m.Cubes, dealt: m.DmgDealt, taken: m.DmgTaken, zone: m.ZoneDmg, name: nm, shots: m.Shots, hits: m.Hits}
+					r := result{place: m.Place, kills: m.Kills, deathT: m.DeathT, cubes: m.Cubes, dealt: m.DmgDealt, taken: m.DmgTaken, zone: m.ZoneDmg, name: nm, shots: m.Shots, hits: m.Hits, fw: m.FirstW, fl: m.FirstLas, c60: m.Cubes60, c120: m.Cubes120, alive60: m.DeathT >= 60 || m.Alive}
 					if ti < len(tm) {
 						r.maxMs = float64(tm[ti].max.Microseconds()) / 1000
 						r.avgMs = float64(tm[ti].sum.Microseconds()) / 1000 / float64(max(tm[ti].n, 1))
@@ -301,6 +305,23 @@ func main() {
 			hits += r.hits
 		}
 		c := float64(len(rs))
+		var fwS, flS float64
+		var fwN, flN, a60, c60 int
+		for _, r := range rs {
+			if r.fw >= 0 {
+				fwS += r.fw
+				fwN++
+			}
+			if r.fl >= 0 {
+				flS += r.fl
+				flN++
+			}
+			if r.alive60 {
+				a60++
+				c60 += r.c60
+			}
+		}
+		fmt.Printf("%-10s firstWeapon %.0fs (%d%%) laser %.0fs (%d%%) cubes@60 %.1f (alive %d%%)\n", k, fwS/float64(max(fwN, 1)), 100*fwN/len(rs), flS/float64(max(flN, 1)), 100*flN/len(rs), float64(c60)/float64(max(a60, 1)), 100*a60/len(rs))
 		fmt.Printf("%-10s n=%-4d score %.2f  kills %.2f  life %.0fs  cubes %.1f  dealt %.0f taken %.0f zone %.0f  ms avg %.2f max %.1f  acc %.2f  places %v\n",
 			k, len(rs), pts/c, kills/c, dt/c, cubes/c, dealt/c, taken/c, zone/c, av/c, mx, float64(hits)/float64(max(shots, 1)), hist[1:])
 	}

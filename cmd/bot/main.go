@@ -205,6 +205,11 @@ func handle(ln []byte, pilot **bot.Bot, send func([]byte)) {
 					logf("init panic: %v", r)
 				}
 			}()
+			m := h.Config.Match.ArenaMargin
+			if m < 0 || m > 200 {
+				m = 30
+			}
+			w.SetMargin(m)
 			w.BuildNav(3.0, 9.5, 1.2)
 			*pilot = bot.New(&h, w, bot.DefaultParams())
 		}()

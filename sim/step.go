@@ -814,6 +814,12 @@ func (s *Sim) handleItems(m *Mech) {
 					}
 				}
 				m.W[slot] = w
+				if kind != "gun" && m.FirstW < 0 {
+					m.FirstW = s.T
+				}
+				if kind == "laser" && m.FirstLas < 0 {
+					m.FirstLas = s.T
+				}
 				m.events = append(m.events, proto.Event{Type: "took", ID: rawID(id), Kind: kind, Slot: slot})
 			}
 		}
@@ -1194,6 +1200,15 @@ func (s *Sim) Step() {
 		}
 		if s.T-m.lastSpnd >= m.Stats.EnergyRegenDelay && m.Energy < m.Stats.Energy {
 			m.Energy = math.Min(m.Stats.Energy, m.Energy+m.Stats.EnergyRegen*dt)
+		}
+	}
+	if s.Tick == 1200 || s.Tick == 2400 {
+		for _, m := range s.Mechs {
+			if s.Tick == 1200 {
+				m.Cubes60 = m.Cubes
+			} else {
+				m.Cubes120 = m.Cubes
+			}
 		}
 	}
 	// deaths
