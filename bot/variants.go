@@ -85,6 +85,12 @@ func Variant(name string) Params {
 		p.RetreatHP = 0.15
 		p.EngageRatio = 3
 		p.NoPeek = true
+	case "chase":
+		p.ChaseHP = 0.5
+		p.ChaseD = 55
+	case "chase7":
+		p.ChaseHP = 0.7
+		p.ChaseD = 45
 	case "survivor":
 		p.Endgame = 16
 		p.HuntPassive = false
