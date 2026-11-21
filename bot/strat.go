@@ -182,7 +182,7 @@ func (b *Bot) heldRank(w *proto.WeaponObs) float64 {
 	}
 	if w.Kind == "gun" {
 		// the gun is only ever given up for the laser+lightning pairing
-		if b.P.DropGunForLtn && b.holds("laser") {
+		if (b.P.DropGunForLtn || (b.practice && b.P.PracLasLtn)) && b.holds("laser") {
 			return 0.5
 		}
 		return 99
