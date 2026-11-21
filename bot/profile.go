@@ -279,6 +279,28 @@ func ApplyProfile(p *Params, name string) {
 		p.PracAggroD = 220
 		p.PracAggroHP = 0.45
 		p.PracUpgradePrio = dmgFirst
+	case "f75a220ltn":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracLtnRank = 3.4
+	case "f75a220ll":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracLasLtn = true
+	case "f75a220ltnb":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracLtnRank = 3.4
+		p.PracBerserk = true
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220
