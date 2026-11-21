@@ -164,6 +164,12 @@ func Variant(name string) Params {
 		p.Sites = true
 		p.SiteFarVal = 0
 		p.BossRatio = 0.85
+	case "b7":
+		// previous defaults
+		p.BossRatio = 2.0
+		p.Sites = false
+	case "nosites":
+		p.Sites = false
 	case "sites":
 		p.Sites = true
 	case "sites2":
