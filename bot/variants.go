@@ -307,6 +307,14 @@ func Variant(name string) Params {
 		p.QuietAlways, p.ShyMove0 = true, true
 	case "shy0o15":
 		p.QuietAlways, p.ShyMove0, p.ShyWeapon0 = true, true, true
+	case "ffa0na":
+		p.FFA0, p.QuietNoAim = "always", true
+	case "ffa0q60":
+		p.FFA0, p.QuietT = "always", 60
+	case "ffa0na60":
+		p.FFA0, p.QuietNoAim, p.QuietT = "always", true, 60
+	case "noaim":
+		p.QuietNoAim = true
 	case "shy0n12":
 		p.QuietAlways = true
 		p.ShyNear0 = 12
