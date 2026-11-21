@@ -445,7 +445,11 @@ func mixPick(mix string, seed int64, slot int) string {
 	x *= 0x94D049BB133111EB
 	x ^= x >> 31
 	g := int(x % uint64(m))
-	k := int(hd[2][g] - '0')
+	c := hd[2][g]
+	k := int(c - '0')
+	if c >= 'a' && c <= 'z' {
+		k = int(c-'a') + 10
+	}
 	if k < 0 || k+1 >= len(parts) {
 		k = 0
 	}
