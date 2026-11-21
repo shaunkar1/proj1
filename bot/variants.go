@@ -152,6 +152,8 @@ func Variant(name string) Params {
 		p.OpenCost = 1
 	case "open2":
 		p.OpenCost = 2.5
+	case "noretcubes":
+		p.NoRetreatCubes = true
 	case "explore":
 		p.NoExplore = false
 	case "survivor":
