@@ -147,6 +147,26 @@ func (b *Bot) exposed(eye [3]float64, x, y, z float64) bool {
 	return b.w.ClearCoarse(eye[0], eye[1], eye[2], x, y, z)
 }
 
+// bodyExposed: could a shot from eye reach any part of our body standing at
+// (x,y) on ground gz? Tests the centre, the top and both flanks, because half
+// a mech sticking out past a corner is still a target.
+func (b *Bot) bodyExposed(eye [3]float64, x, y, gz float64) bool {
+	me := b.me
+	h := me.Stats.Height
+	cz := gz + h*0.5
+	if b.w.ClearCoarse(eye[0], eye[1], eye[2], x, y, cz) || b.w.ClearCoarse(eye[0], eye[1], eye[2], x, y, gz+h-0.5) {
+		return true
+	}
+	dx, dy := x-eye[0], y-eye[1]
+	l := math.Hypot(dx, dy)
+	if l < 1 {
+		return true
+	}
+	r := me.Stats.Radius + 0.4
+	px, py := -dy/l*r, dx/l*r
+	return b.w.ClearCoarse(eye[0], eye[1], eye[2], x+px, y+py, cz) || b.w.ClearCoarse(eye[0], eye[1], eye[2], x-px, y-py, cz)
+}
+
 // steer picks the move direction by scoring sampled positions around us.
 func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	me := b.me
@@ -333,7 +353,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				}
 			}
 		}
-		cz := gz + myH
+		_ = myH
 		if hasCarrot {
 			s -= ctx.wGoal * hyp(x, y, carrot[0], carrot[1])
 		} else if ctx.goal != nil {
@@ -354,14 +374,14 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			if d > 290 {
 				continue
 			}
-			exp := b.exposed(th.eye, x, y, cz) || b.exposed(th.eye, x, y, gz+me.Stats.Height-0.5)
+			exp := b.bodyExposed(th.eye, x, y, gz)
 			if th.isTgt {
 				sc[ci].expTgt = exp
 			}
 			if !exp && peek && th.t.has[2] && !th.t.NPC {
 				// it is moving: will it have the line a moment from now?
 				e2 := [3]float64{th.eye[0] + th.t.Vel[0]*0.7, th.eye[1] + th.t.Vel[1]*0.7, th.eye[2]}
-				if b.exposed(e2, x, y, cz) {
+				if b.bodyExposed(e2, x, y, gz) {
 					s -= 0.5 * 315 * math.Max(th.weight, 0.6) * boolf(b.laserIn(th.t) < 1.5)
 				}
 			}

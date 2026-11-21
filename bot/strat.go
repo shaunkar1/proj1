@@ -237,6 +237,7 @@ func (b *Bot) decide(act *proto.Action) {
 	hpFrac := me.HP / math.Max(1, me.MaxHP)
 
 	// ---- threats
+	var ghost *Track // someone hitting us from where we cannot see
 	var threats []threat
 	var mechs []*Track
 	incoming := 0.0
@@ -270,7 +271,10 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		eh := 8.0 * t.Scale
 		threats = append(threats, threat{t: t, eye: [3]float64{t.Pos[0], t.Pos[1], t.Pos[2] + eh}, weight: w})
-		if age < 0.3 {
+		if t.Ghost && age < 2.5 {
+			ghost = t
+		}
+		if age < 0.3 && !t.Ghost {
 			mechs = append(mechs, t)
 			if t.LOS && hostile && (facing < 0.6 || b.t-t.HitMe < 3) {
 				incoming += b.enemyDps(t, d)
@@ -426,6 +430,15 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.target = tgt
 			ctx.strafe = false
 		}
+	case ghost != nil && (tgt == nil || !tgt.LOS) && b.t-ghost.HitMe < 2.5:
+		// being hit by someone unseen: never stand there, get something solid in between
+		mode = "evade"
+		sp := b.findSafe(threats)
+		goal, hasGoal = sp, true
+		ctx.hide = true
+		ctx.boost = me.Energy > 10
+		ctx.wGoal = 1.5
+		ctx.mustMove = true
 	case b.retreating || (tgt != nil && !engage && (underFire || incoming > 0)):
 		mode = "retreat"
 		sp := b.findSafe(threats)
@@ -683,6 +696,13 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 
 	// ---- aim and fire
+	b.lasCrate = false
+	b.lasFree = true
+	for _, t := range b.trackL {
+		if !t.NPC && b.t-t.Seen < 4 {
+			b.lasFree = false
+		}
+	}
 	shot := false
 	var shootT *Track
 	// prefer a visible mech we can hit; finishing blows first
@@ -749,22 +769,22 @@ func (b *Bot) decide(act *proto.Action) {
 		if !shot && !b.retreating {
 			// opportunistic: any crate in easy reach
 			var bc *Item
-			bd := 75.0
+			bd := 110.0
 			for _, c := range b.crateL {
-				if c.Roof && c.Pos[2] > me.Pos[2]+25 {
-					continue
+				if c.Roof && c.Pos[2] > me.Pos[2]+3 {
+					continue // what falls out would stay on the roof
 				}
 				d := hyp(c.Pos[0], c.Pos[1], px, py)
-				if d < bd && b.t-c.Seen < 0.5 {
+				if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad {
 					bd, bc = d, c
 				}
 			}
-			if bc != nil && bd < 45 {
+			if bc != nil && (bd < 50 || b.lasFree) {
 				shot = b.shootCrate(act, bc)
 			}
 		}
 	}
-	if las, li := b.weapon("laser"); las != nil && las.Charge > 0 && !act.Fire[li] && shootT == nil {
+	if las, li := b.weapon("laser"); las != nil && las.Charge > 0 && !act.Fire[li] && shootT == nil && !b.lasCrate {
 		act.Fire[li] = true // never let go without a target
 	}
 	if !shot {
@@ -833,7 +853,7 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 			if threats[i].t.NPC {
 				continue
 			}
-			if b.exposed(threats[i].eye, b.safeSpot[0], b.safeSpot[1], z) {
+			if b.bodyExposed(threats[i].eye, b.safeSpot[0], b.safeSpot[1], z-me.Stats.Height*0.5) {
 				ok = false
 				break
 			}
@@ -864,7 +884,7 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 				continue
 			}
 			d := hyp(x, y, th.t.Pos[0], th.t.Pos[1])
-			if b.exposed(th.eye, x, y, z) {
+			if b.bodyExposed(th.eye, x, y, z-me.Stats.Height*0.5) {
 				s -= 150 * th.weight
 			}
 			s += math.Min(d, 120) * 0.5 * th.weight
@@ -898,7 +918,10 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if zEnd.outside(ob.pos[0], ob.pos[1]) > -8 && d/me.Stats.WalkSpeed*1.6+4 > budget {
 			return
 		}
-		s := ob.value - d
+		s := ob.value - d*0.6
+		if ob.kind == b.lastObjKind && hyp(ob.pos[0], ob.pos[1], b.lastObjPos[0], b.lastObjPos[1]) < 3 {
+			s += 15 // finish what we started
+		}
 		if s > bs {
 			bs = s
 			o := ob
@@ -909,7 +932,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 || b.t < it.Bad {
 			continue
 		}
-		consider(objective{kind: "cube", pos: it.Pos, value: 85, item: it})
+		consider(objective{kind: "cube", pos: it.Pos, value: 110, item: it})
 	}
 	for _, it := range b.pickupL {
 		if b.t < it.Bad {
@@ -948,13 +971,13 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			if (it.Roof && it.Pos[2] > me.Pos[2]+3) || b.t < it.Bad {
 				continue
 			}
-			consider(objective{kind: "crate", pos: it.Pos, value: 75, item: it})
+			consider(objective{kind: "crate", pos: it.Pos, value: 105, item: it})
 		}
 	}
 	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear {
 		for _, t := range b.trackL {
 			if t.NPC && b.t-t.Seen < 3 {
-				consider(objective{kind: "npc", pos: t.Pos, value: 95, trk: t})
+				consider(objective{kind: "npc", pos: t.Pos, value: 140, trk: t})
 			}
 		}
 	}
@@ -981,9 +1004,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "hunt", pos: t.Pos, value: 120 - (b.t-t.Seen)*3, trk: t})
 		}
 	}
-	// stay on an objective until done unless something clearly better shows up
 	_ = px
 	_ = py
+	if best != nil {
+		b.lastObjKind, b.lastObjPos = best.kind, best.pos
+	}
 	return best
 }
 

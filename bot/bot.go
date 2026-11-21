@@ -48,7 +48,7 @@ func DefaultParams() Params {
 		PrefRangeGun: 130, PrefRangeLas: 140, PrefRangeLtn: 30,
 		JukeMin: 0.35, JukeMax: 0.9, WExpo: 1.0, WAtk: 1.0, WGoal: 1.0, WRange: 1.2,
 		HuntPassive: true, HuntAfter: 20, FarmNPC: true, UseDrops: true,
-		UpgradePrio: []string{"plating", "armor", "nanites", "lightning_efficiency", "gun_damage", "gun_rate", "laser_damage", "laser_charge",
+		UpgradePrio: []string{"plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
 			"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
@@ -85,9 +85,11 @@ type Track struct {
 	lasChargeT  float64 // when its current laser charge began
 	lasFireT    float64 // when its laser last fired (or lost its charge)
 	wasCharging bool
-	Hostile     float64 // considered hostile until this time
-	aimedAt     float64 // accumulated seconds spent aiming at us
-	has         [4]bool // gun mortar laser lightning
+	Ghost       bool       // position is a guess from being shot, not a sighting
+	aimOff      [3]float64 // offset from its centre to the part we have a line on
+	Hostile     float64    // considered hostile until this time
+	aimedAt     float64    // accumulated seconds spent aiming at us
+	has         [4]bool    // gun mortar laser lightning
 }
 
 func (t *Track) Center() [3]float64 {
@@ -168,45 +170,49 @@ type Bot struct {
 	wantMove   bool
 
 	// combat state
-	targetID   int
-	retreating bool
-	lastDmgT   float64 // last time I took weapon damage
-	lastDmgBy  int
-	lastDmgDir float64
-	dmgRecent  float64 // decayed incoming dps estimate
-	scanPhase  float64
-	lasHold    bool
-	cmdAim     [2]float64
-	kills      int
-	othersDied int
-	prevAlive  int
-	mode       string
-	goalKind   string
-	takeTryT   float64
-	hearT      float64
-	hearDir    float64
-	safeSpot   [2]float64
-	safeT      float64
-	roamGoal   [2]float64
-	roamT      float64
-	blockedC   map[int]float64
-	objID      int
-	objT       float64
-	searchTick int       // tick of the last path search (at most one per decision)
-	coverNear  bool      // last steer found a spot hidden from the target close by
-	hop        *geo.Exit // jet hop in progress (or being walked to)
-	hopFly     bool
-	hopT       float64
-	hopFail    float64
-	climbID    int
-	climbT     float64
-	climbPos   [3]float64
-	climbFrom  [2]float64
-	spawnYaw   float64
-	zonePathT  float64
-	zonePathG  [2]float64
-	zonePathC  float64
-	dbg        string
+	targetID    int
+	retreating  bool
+	lastDmgT    float64 // last time I took weapon damage
+	lastDmgBy   int
+	lastDmgDir  float64
+	dmgRecent   float64 // decayed incoming dps estimate
+	scanPhase   float64
+	lasHold     bool
+	cmdAim      [2]float64
+	kills       int
+	othersDied  int
+	prevAlive   int
+	mode        string
+	goalKind    string
+	takeTryT    float64
+	hearT       float64
+	hearDir     float64
+	safeSpot    [2]float64
+	safeT       float64
+	roamGoal    [2]float64
+	roamT       float64
+	blockedC    map[int]float64
+	lastObjKind string
+	lastObjPos  [3]float64
+	objID       int
+	objT        float64
+	searchTick  int  // tick of the last path search (at most one per decision)
+	lasFree     bool // no mech around: the laser may be spent on crates
+	lasCrate    bool
+	coverNear   bool      // last steer found a spot hidden from the target close by
+	hop         *geo.Exit // jet hop in progress (or being walked to)
+	hopFly      bool
+	hopT        float64
+	hopFail     float64
+	climbID     int
+	climbT      float64
+	climbPos    [3]float64
+	climbFrom   [2]float64
+	spawnYaw    float64
+	zonePathT   float64
+	zonePathG   [2]float64
+	zonePathC   float64
+	dbg         string
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
@@ -271,6 +277,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, Scale: 1, lasFireT: -100, lasChargeT: -100}
 			b.tracks[a.ID] = t
 		}
+		t.Ghost = false
 		t.PrevVel = t.Vel
 		t.Pos, t.Vel, t.Aim = a.Pos, a.Vel, a.Aim
 		t.HP, t.MaxHP, t.Cubes, t.Weapons, t.Charging = a.HP, a.MaxHP, a.Cubes, a.Weapons, a.Charging
@@ -310,7 +317,27 @@ func (b *Bot) perceive(o *proto.Obs) {
 		}
 		c := t.Center()
 		tp := t.Top()
-		t.LOS = b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0], c[1], c[2]) || b.w.Clear(b.muz[0], b.muz[1], b.muz[2], tp[0], tp[1], tp[2])
+		// which part of it can we hit? centre, top, or either flank
+		t.aimOff = [3]float64{}
+		t.LOS = b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0], c[1], c[2])
+		if !t.LOS && b.w.Clear(b.muz[0], b.muz[1], b.muz[2], tp[0], tp[1], tp[2]) {
+			t.LOS = true
+			t.aimOff = [3]float64{0, 0, tp[2] - c[2] - 0.6}
+		}
+		if !t.LOS {
+			dx, dy := c[0]-b.muz[0], c[1]-b.muz[1]
+			if l := math.Hypot(dx, dy); l > 3 {
+				r := t.Radius() * 0.75
+				ox, oy := -dy/l*r, dx/l*r
+				if b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0]+ox, c[1]+oy, c[2]) {
+					t.LOS = true
+					t.aimOff = [3]float64{ox, oy, 0}
+				} else if b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0]-ox, c[1]-oy, c[2]) {
+					t.LOS = true
+					t.aimOff = [3]float64{-ox, -oy, 0}
+				}
+			}
+		}
 		if !t.NPC {
 			d := hyp(a.Pos[0], a.Pos[1], me.Pos[0], me.Pos[1])
 			brg := math.Atan2(me.Pos[1]-a.Pos[1], me.Pos[0]-a.Pos[0])
@@ -405,7 +432,47 @@ func (b *Bot) perceive(o *proto.Obs) {
 			}
 			if e.By != nil {
 				b.lastDmgBy = *e.By
-				if t := b.tracks[*e.By]; t != nil {
+				t := b.tracks[*e.By]
+				if *e.By < 100 && e.Bearing != nil && (t == nil || o.T-t.Seen > 0.35 || t.Ghost) {
+					// shot by something we cannot see: place a ghost along the bearing
+					d := 110.0
+					switch e.Weapon {
+					case "lightning":
+						d = 35
+					case "mortar":
+						d = 60
+					}
+					if t != nil && !t.Ghost && o.T-t.Seen < 8 {
+						d = hyp(t.Pos[0], t.Pos[1], me.Pos[0], me.Pos[1])
+					}
+					for i := range o.Beams {
+						if bm := &o.Beams[i]; bm.By == *e.By && len(bm.Path) > 0 {
+							d = hyp(bm.Path[0][0], bm.Path[0][1], me.Pos[0], me.Pos[1])
+						}
+					}
+					if t == nil {
+						t = &Track{ID: *e.By, First: o.T, IHit: -100, Scale: 1, lasFireT: -100, lasChargeT: -100, MaxHP: 1400, HP: 1400}
+						b.tracks[*e.By] = t
+					}
+					gx, gy := me.Pos[0]+math.Cos(*e.Bearing)*d, me.Pos[1]+math.Sin(*e.Bearing)*d
+					t.Pos = [3]float64{gx, gy, b.w.Ground(gx, gy)}
+					t.Vel = [3]float64{}
+					t.Ghost = true
+					t.Seen = o.T
+					t.LOS = false
+					switch e.Weapon {
+					case "gun":
+						t.has[0] = true
+					case "mortar":
+						t.has[1] = true
+					case "laser":
+						t.has[2] = true
+						t.lasFireT = o.T
+					case "lightning":
+						t.has[3] = true
+					}
+				}
+				if t != nil {
 					t.HitMe = o.T
 					t.DmgToMe += e.Amount
 					t.Hostile = math.Max(t.Hostile, o.T+25)

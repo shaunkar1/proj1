@@ -107,6 +107,9 @@ func (b *Bot) scorePredictors(t *Track) {
 // predict returns the target's centre after dt seconds.
 func (b *Bot) predict(t *Track, dt float64) [3]float64 {
 	c := t.Center()
+	c[0] += t.aimOff[0]
+	c[1] += t.aimOff[1]
+	c[2] += t.aimOff[2]
 	ls := b.P.LeadScale
 	vx, vy := t.Vel[0], t.Vel[1]
 	if !t.NPC && t.hn > 3 && !b.P.NoAdapt {
@@ -217,6 +220,11 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	}
 	tolY := math.Atan2(rad*0.85, d)
 	tolP := math.Atan2(hgt*0.42, d)
+	if t.aimOff != ([3]float64{}) {
+		// only part of it shows: aim tighter
+		tolY = math.Atan2(rad*0.22, d)
+		tolP = math.Atan2(hgt*0.12, d)
+	}
 	var cmd [2]float64
 	have := false
 	shot := false
@@ -325,6 +333,20 @@ func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 	}
 	if ltn, ni := b.weapon("lightning"); ltn != nil && d < ltn.Stats.Range-1 && b.me.Energy > 0.7*b.me.MaxEnergy && ey < 0.3 {
 		act.Fire[ni] = true
+	}
+	// a full laser charge opens a crate in one shot: use it when nobody is about
+	if las, li := b.weapon("laser"); las != nil && b.lasFree && d < las.Stats.Range-5 && it.HP > 100 {
+		full := las.Stats.Charge
+		if las.Charge > 0 {
+			act.Fire[li] = true
+			if las.Charge >= full-0.06 && ey < math.Atan2(0.9, d) && ep < math.Atan2(0.8, d) {
+				act.Fire[li] = false
+			}
+			b.lasCrate = true
+		} else if las.Cooldown <= 0.11 {
+			act.Fire[li] = true
+			b.lasCrate = true
+		}
 	}
 	return true
 }
