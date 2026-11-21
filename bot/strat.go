@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -682,6 +683,8 @@ func (b *Bot) decide(act *proto.Action) {
 						ob.item.Bad = b.t + 60
 					}
 				}
+			case "npcgo":
+				ctx.arrive = 30
 			case "explore":
 				ctx.arrive = 20
 			case "hunt":
@@ -1281,7 +1284,21 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear {
 		for _, t := range b.trackL {
 			if t.NPC && b.t-t.Seen < 3 {
-				consider(objective{kind: "npc", pos: t.Pos, value: 140, trk: t})
+				consider(objective{kind: "npc", pos: t.Pos, value: b.P.NPCValue, trk: t})
+			}
+		}
+		if b.P.NPCMemory {
+			ids := make([]int, 0, len(b.npcMem))
+			for id := range b.npcMem {
+				ids = append(ids, id)
+			}
+			sort.Ints(ids)
+			for _, id := range ids {
+				it := b.npcMem[id]
+				if tr := b.tracks[id]; tr != nil && b.t-tr.Seen < 3 {
+					continue
+				}
+				consider(objective{kind: "npcgo", pos: it.Pos, value: b.P.NPCValue - 15})
 			}
 		}
 	}
