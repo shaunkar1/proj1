@@ -351,9 +351,9 @@ func (b *Bot) decide(act *proto.Action) {
 	// squad matches (and any match until another mech's death shows it is a
 	// free-for-all) run on the settings the scored practice build used, so that
 	// later free-for-all changes cannot move the practice score
-	b.E = effP{b.P.BossRatio, b.P.HardRatio, b.P.BossObjD, b.P.BossAvoidD, b.P.BossSeenD, b.P.PileBonus, b.P.ExploreOld}
+	b.E = effP{b.P.BossRatio, b.P.HardRatio, b.P.BossObjD, b.P.BossAvoidD, b.P.BossSeenD, b.P.PileBonus, b.P.ExploreOld, b.P.Calm, b.P.ObjHide}
 	if !b.ffaSure && !b.P.NoLegacy {
-		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true}
+		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false}
 	}
 	b.boss = nil
 	b.peer = nil
@@ -622,7 +622,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
-	case boss != nil && (bossD < b.E.BossAvoidD || (boss.LOS && b.t-boss.Seen < 1.5 && bossD < b.E.BossSeenD)) && !(tgt == boss && finishing):
+	case boss != nil && (bossD < b.E.BossAvoidD || (boss.LOS && b.t-boss.Seen < 1.5 && bossD < b.E.BossSeenD && !(b.E.Calm && b.t-boss.HitMe > 6 && boss.aimedAt < 0.3))) && !(tgt == boss && finishing):
 		// outclassed: break its line and open the distance; shoot only if it costs nothing
 		mode = "avoid"
 		sp := b.findSafe(threats)
@@ -1398,6 +1398,13 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			s += 15 // finish what we started
 		}
 		if s > bs {
+			if bo := b.boss; bo != nil && b.E.ObjHide && d > 12 && b.t-bo.Seen < 8 && hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1]) < 260 {
+				// work it cannot watch: standing in a stronger mech's view is how first strikes land
+				eye := [3]float64{bo.Pos[0], bo.Pos[1], bo.Pos[2] + me.Stats.EyeHeight}
+				if b.bodyExposed(eye, ob.pos[0], ob.pos[1], b.w.Ground(ob.pos[0], ob.pos[1])) {
+					return
+				}
+			}
 			bs = s
 			o := ob
 			best = &o

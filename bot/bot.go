@@ -68,6 +68,8 @@ type Params struct {
 	ChaseD          float64 // range held while chasing
 	PracStopKills   int     // measurement: go idle in practice after this many kills
 	Probe           string  // measurement runs (see probeStop)
+	Calm            bool    // a stronger mech in view that is not aiming at us and has not hit us lately does not send us to cover
+	ObjHide         bool    // with a stronger mech around, only take on work it cannot see
 	Open            bool    // strike first with a ready laser, or at a mech busy with someone else
 	OpenRatio       float64 // ... unless it is this much stronger than us
 	OpenHP          float64
@@ -128,7 +130,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, EvadeSniper: true, Open: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -757,4 +759,6 @@ func (b *Bot) probeStop() bool {
 type effP struct {
 	BossRatio, HardRatio, BossObjD, BossAvoidD, BossSeenD, PileBonus float64
 	ExploreOld                                                       bool
+	Calm                                                             bool
+	ObjHide                                                          bool
 }
