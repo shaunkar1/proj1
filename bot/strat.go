@@ -776,6 +776,17 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.wGoal = 0.8
 		}
 		d := hyp(px, py, tgt.Pos[0], tgt.Pos[1])
+		if b.P.LtnKite && tgt.has[3] && !b.holds("lightning") {
+			// its arc does 240 a second inside 45 m and shorts our laser; outside that it only has a gun
+			if prefD < 150 {
+				prefD = 150
+				ctx.pref = prefD
+			}
+			if d < 80 && me.Energy > 6 {
+				ctx.boost = true
+			}
+			b.ltnClose = d < 65
+		}
 		if prefD < 50 && d > prefD+12 && d < 120 && me.Energy > 45 {
 			ctx.boost = true // close the gap for the short-range weapon
 		}
@@ -1335,6 +1346,12 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	if las, li := b.weapon("laser"); las != nil && las.Charge > 0 && !act.Fire[li] && shootT == nil && !b.lasCrate {
 		act.Fire[li] = true // never let go without a target
+	}
+	if b.ltnClose {
+		if las, li := b.weapon("laser"); las != nil && las.Charge == 0 {
+			act.Fire[li] = false // charging would halve our speed with the arc this close
+		}
+		b.ltnClose = false
 	}
 	if !shot {
 		b.scan(act, hasGoal, goal)

@@ -371,6 +371,8 @@ func Variant(name string) Params {
 		p.QuietCap = 180
 	case "qa4c300":
 		p.QuietAlive, p.QuietCap = 4, 300
+	case "lk":
+		p.LtnKite = true
 	case "nobossfar":
 		p.BossFarD = 0
 	case "bossfar110":
