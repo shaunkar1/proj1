@@ -64,17 +64,7 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 	me := b.me
 	if b.path == nil || hyp(gx, gy, b.pathGoal[0], b.pathGoal[1]) > 5 || b.t-b.pathT > 0.8 || !b.pathOK {
 		if b.t-b.pathT > 0.25 || hyp(gx, gy, b.pathGoal[0], b.pathGoal[1]) > 5 {
-			extra := func(c int) float32 {
-				if _, bad := b.blockedC[c]; bad {
-					return 30
-				}
-				return 0
-			}
-			var ex func(int) float32
-			if len(b.blockedC) > 0 {
-				ex = extra
-			}
-			b.path, b.pathCost = nv.Path(me.Pos[0], me.Pos[1], gx, gy, 40000, ex)
+			b.path, b.pathCost = nv.Path(me.Pos[0], me.Pos[1], gx, gy, 60000, b.navExtra())
 			b.pathGoal = [2]float64{gx, gy}
 			b.pathT = b.t
 			b.pathOK = b.path != nil
@@ -107,6 +97,39 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 		}
 	}
 	return b.path[best][0], b.path[best][1], true
+}
+
+// navExtra is the per-cell extra cost for path search: cells we found blocked,
+// and ground the zone is about to take.
+func (b *Bot) navExtra() func(int) float32 {
+	nv := b.w.Nav
+	z := b.zoneAt(b.t + 4)
+	r2 := (z.r - 3) * (z.r - 3)
+	nb := len(b.blockedC)
+	return func(c int) float32 {
+		var e float32
+		if nb > 0 {
+			if _, bad := b.blockedC[c]; bad {
+				e += 30
+			}
+		}
+		x, y := nv.Pos(c)
+		dx, dy := x-z.c[0], y-z.c[1]
+		if dx*dx+dy*dy > r2 {
+			e += 12
+		}
+		return e
+	}
+}
+
+// pathCostTo runs a path search and returns the walking distance (metres),
+// or -1 if unreachable.
+func (b *Bot) pathCostTo(gx, gy float64) float64 {
+	p, c := b.w.Nav.Path(b.me.Pos[0], b.me.Pos[1], gx, gy, 60000, b.navExtra())
+	if p == nil {
+		return -1
+	}
+	return c
 }
 
 // pathDist estimates walking distance to a point (cheap, straight-line based).
@@ -159,6 +182,14 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			carrot = [2]float64{cx, cy}
 			hasCarrot = true
 		}
+	}
+	if Debug && (DebugSlot < 0 || b.slot == DebugSlot) && os.Getenv("MECH_DEBUG") == "nav" {
+		gx, gy := 0.0, 0.0
+		if ctx.goal != nil {
+			gx, gy = ctx.goal[0], ctx.goal[1]
+		}
+		z := b.o.Zone
+		fmt.Fprintf(os.Stderr, "NAV t=%.1f pos=(%.0f,%.0f) goal=(%.0f,%.0f) carrot=(%.0f,%.0f) has=%v pathlen=%d ok=%v zone=(%.0f,%.0f,%.0f)->(%.0f,%.0f,%.0f) %0.f-%.0f\n", b.t, px, py, gx, gy, carrot[0], carrot[1], hasCarrot, len(b.path), b.pathOK, z.Center[0], z.Center[1], z.Radius, z.NextCenter[0], z.NextCenter[1], z.NextRadius, z.ShrinkStart, z.ShrinkEnd)
 	}
 	// strafe side flips at random intervals
 	if b.t >= b.strafeT {
@@ -287,11 +318,13 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		} else if ctx.goal != nil {
 			s -= ctx.wGoal * 0.5 * hyp(x, y, ctx.goal[0], ctx.goal[1])
 		}
-		// zone
-		if o := zNow.outside(x, y); o > -2 {
-			s -= 400 + 25*(o+2)
-		} else if o2 := zSoon.outside(x, y); o2 > -4 {
-			s -= 60 + 8*(o2+4)
+		// zone (the path's own next step is trusted when we have to move)
+		if !(c.free && ctx.mustMove) {
+			if o := zNow.outside(x, y); o > -2 {
+				s -= 400 + 25*(o+2)
+			} else if o2 := zSoon.outside(x, y); o2 > -4 {
+				s -= 60 + 8*(o2+4)
+			}
 		}
 		// threats and line of fire
 		for i := range ctx.threats {

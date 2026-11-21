@@ -277,9 +277,29 @@ func (b *Bot) decide(act *proto.Action) {
 	marginR := math.Min(14, zEnd.r*0.35)
 	needIn := dNext - (zEnd.r - marginR) // metres to travel to be safely inside the next circle
 	zoneGo := false
+	zoneLate := false
 	var zoneGoal [2]float64
+	budget := 1e9 // spare seconds before we must start walking in
 	if needIn > 0 {
-		travel := needIn*1.35/me.Stats.WalkSpeed + 5
+		f := (zEnd.r - marginR - 4) / math.Max(dNext, 1)
+		if f < 0 {
+			f = 0
+		}
+		zoneGoal = [2]float64{zEnd.c[0] + (px-zEnd.c[0])*f, zEnd.c[1] + (py-zEnd.c[1])*f}
+		if c := b.w.Nav.Nearest(zoneGoal[0], zoneGoal[1], 80); c >= 0 {
+			x, y := b.w.Nav.Pos(c)
+			zoneGoal = [2]float64{x, y}
+		}
+		// real walking distance, refreshed now and then
+		if b.t-b.zonePathT > 1.5 || hyp(zoneGoal[0], zoneGoal[1], b.zonePathG[0], b.zonePathG[1]) > 25 {
+			b.zonePathT = b.t
+			b.zonePathG = zoneGoal
+			b.zonePathC = b.pathCostTo(zoneGoal[0], zoneGoal[1])
+			if b.zonePathC < 0 {
+				b.zonePathC = needIn * 2.5
+			}
+		}
+		travel := b.zonePathC/me.Stats.WalkSpeed*1.1 + 3
 		// when does the edge reach us?
 		tEdge := o.Zone.ShrinkEnd
 		for k := 0; k <= 20; k++ {
@@ -292,22 +312,14 @@ func (b *Bot) decide(act *proto.Action) {
 				break
 			}
 		}
-		// leave early enough to walk the whole way before the shrink ends
-		leaveBy := math.Min(tEdge-4, o.Zone.ShrinkEnd-travel)
-		if b.t >= leaveBy || !me.InZone {
-			zoneGo = true
-			f := (zEnd.r - marginR - 4) / math.Max(dNext, 1)
-			if f < 0 {
-				f = 0
-			}
-			zoneGoal = [2]float64{zEnd.c[0] + (px-zEnd.c[0])*f, zEnd.c[1] + (py-zEnd.c[1])*f}
-			if c := b.w.Nav.Nearest(zoneGoal[0], zoneGoal[1], 60); c >= 0 {
-				x, y := b.w.Nav.Pos(c)
-				zoneGoal = [2]float64{x, y}
-			}
+		leaveBy := math.Min(tEdge-5, o.Zone.ShrinkEnd-travel-6)
+		budget = leaveBy - b.t
+		if budget <= 0 || !me.InZone {
+			zoneLate = true
 		}
+		zoneGo = true
 	}
-	zoneUrgent := zoneGo && (!me.InZone || b.zoneAt(b.t+6).outside(px, py) > -3)
+	zoneUrgent := zoneGo && (zoneLate || b.zoneAt(b.t+6).outside(px, py) > -3)
 
 	// ---- fight or flight
 	engage := false
@@ -407,7 +419,11 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.wGoal = 0.6
 		}
 	default:
-		if zoneGo {
+		ob := (*objective)(nil)
+		if !(hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0) {
+			ob = b.pickObjective(zEnd, hpFrac, len(mechs) > 0, budget)
+		}
+		if zoneGo && ob == nil {
 			mode = "zone"
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 2
@@ -418,7 +434,7 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = b.findSafe(threats), true
 			ctx.hide = true
 			ctx.arrive = 2
-		} else if ob := b.pickObjective(zEnd, hpFrac, len(mechs) > 0); ob != nil {
+		} else if ob != nil {
 			mode = ob.kind
 			goal, hasGoal = [2]float64{ob.pos[0], ob.pos[1]}, true
 			switch ob.kind {
@@ -698,7 +714,7 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 	return best
 }
 
-func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool) *objective {
+func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget float64) *objective {
 	me := b.me
 	px, py := me.Pos[0], me.Pos[1]
 	var best *objective
@@ -710,7 +726,8 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool) *objec
 		if b.zoneAt(eta+3).outside(ob.pos[0], ob.pos[1]) > -5 {
 			return
 		}
-		if zEnd.outside(ob.pos[0], ob.pos[1]) > 0 && eta+d/me.Stats.WalkSpeed > b.o.Zone.ShrinkEnd-8 {
+		// outside the next circle: only if the detour fits in the spare time
+		if zEnd.outside(ob.pos[0], ob.pos[1]) > -8 && d/me.Stats.WalkSpeed*1.6+4 > budget {
 			return
 		}
 		s := ob.value - d

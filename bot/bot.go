@@ -180,6 +180,9 @@ type Bot struct {
 	roamGoal   [2]float64
 	roamT      float64
 	blockedC   map[int]float64
+	zonePathT  float64
+	zonePathG  [2]float64
+	zonePathC  float64
 	dbg        string
 }
 
@@ -195,6 +198,7 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b.targetID = -1
 	b.lastDmgBy = -1
 	b.lastDmgT = -100
+	b.zonePathT = -100
 	b.prevAlive = int(h.Config.Match.Mechs)
 	if b.prevAlive == 0 {
 		b.prevAlive = 16
