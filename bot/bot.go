@@ -697,6 +697,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 	if o.Alive < b.prevAlive {
 		b.prevAlive = o.Alive
 	}
+	if !b.ffaSure && b.wallMed > 0 && b.ffaByClock() {
+		b.ffaSure, b.sawOtherDeath = true, true
+	}
 	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
 	if b.othersDied > 0 {
 		b.sawOtherDeath = true
@@ -803,6 +806,16 @@ func (b *Bot) ffaAtStart() bool {
 	return false
 }
 
+// ffaByClock: the match is a free-for-all because the server waits on other teams' bots between ticks.
+func (b *Bot) ffaByClock() bool {
+	if len(b.P.FFA0) > 4 && b.P.FFA0[:4] == "wall" {
+		if v, err := strconv.Atoi(b.P.FFA0[4:]); err == nil {
+			return b.wallMed > float64(v)
+		}
+	}
+	return false
+}
+
 // probeStop: measurement builds go idle under a condition, so the score reveals
 // something about the matches the scorer runs.
 func (b *Bot) probeStop() bool {
@@ -810,6 +823,12 @@ func (b *Bot) probeStop() bool {
 		// stop at a set time: the score is then the kills made by that time
 		if v, err := strconv.Atoi(b.P.Probe[1:]); err == nil {
 			return b.t >= float64(v)
+		}
+	}
+	if len(b.P.Probe) > 2 && b.P.Probe[:2] == "dt" {
+		// stop when the server ticks slower than this many milliseconds
+		if v, err := strconv.Atoi(b.P.Probe[2:]); err == nil {
+			return b.wallMed > float64(v)
 		}
 	}
 	switch b.P.Probe {
