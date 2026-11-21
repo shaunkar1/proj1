@@ -19,6 +19,20 @@ func Variant(name string) Params {
 			return p
 		}
 	}
+	if strings.HasPrefix(name, "P_") || strings.HasPrefix(name, "Q_") {
+		// practice-profile sweeps: P_ = the d100 ticket base, Q_ = without the supply-drop rush; _ separates modifiers
+		base := "f75a220+g+s+d100"
+		if name[0] == 'Q' {
+			base = "f75a220+g+s"
+		}
+		p = baseParams()
+		p.Name = name
+		if rest := strings.Trim(name[2:], "_"); rest != "" {
+			base += "+" + strings.ReplaceAll(rest, "_", "+")
+		}
+		ApplyProfile(&p, base)
+		return p
+	}
 	if strings.HasPrefix(name, "prof:") {
 		p = baseParams()
 		p.Name = name
