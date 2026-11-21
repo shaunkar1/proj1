@@ -9,6 +9,12 @@ import (
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
+	if strings.HasPrefix(name, "prof:") {
+		p = baseParams()
+		p.Name = name
+		ApplyProfile(&p, name[5:])
+		return p
+	}
 	if strings.HasPrefix(name, "dancer") && len(name) > 6 && name != "dancernd" {
 		if v, err := strconv.Atoi(name[6:]); err == nil {
 			p.NoFire = true

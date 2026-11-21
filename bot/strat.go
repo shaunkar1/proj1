@@ -156,9 +156,13 @@ func (b *Bot) bestRange(t *Track) (float64, float64) {
 
 func (b *Bot) pickUpgrade(o *proto.Offer) int {
 	best, bi := 1<<30, 0
+	prio := b.P.UpgradePrio
+	if b.practice && len(b.P.PracUpgradePrio) > 0 {
+		prio = b.P.PracUpgradePrio
+	}
 	for i, c := range o.Choices {
 		r := 1 << 20
-		for k, id := range b.P.UpgradePrio {
+		for k, id := range prio {
 			if id == c.ID {
 				r = k
 				break
@@ -324,6 +328,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 
+	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
 	// ---- target choice
 	var tgt *Track
 	bestV := -1e18
@@ -440,9 +445,18 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	_ = adv
+	retreatHP := b.P.RetreatHP
+	if b.practice {
+		if b.P.PracRetreatHP >= 0 {
+			retreatHP = b.P.PracRetreatHP
+		}
+		if b.P.PracBerserk && tgt != nil {
+			engage = true
+		}
+	}
 	finishing := tgt != nil && myTTK < 1.6
 	if !b.retreating {
-		if hpFrac < b.P.RetreatHP && (incoming > 0 || b.t-b.lastDmgT < 3) && !finishing {
+		if hpFrac < retreatHP && (incoming > 0 || b.t-b.lastDmgT < 3) && !finishing {
 			b.retreating = true
 		}
 	} else if hpFrac > b.P.ReengageHP || (len(mechs) == 0 && b.t-b.lastDmgT > 6 && hpFrac > 0.55) {
@@ -847,13 +861,19 @@ func (b *Bot) decide(act *proto.Action) {
 // fair reports whether a mech is a legitimate target right now: it is hostile
 // to us, or weak enough to be worth starting a fight over.
 func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
+	if b.farmPhase {
+		return b.t-t.HitMe < 4 && d < 100
+	}
 	if b.t < t.Hostile {
 		return true
 	}
 	if b.P.Aggressive {
 		return true
 	}
-	if b.practice && b.P.PracAggro && hpFrac > 0.6 && d < 160 {
+	if b.practice && b.P.PracBerserk {
+		return true
+	}
+	if b.practice && b.P.PracAggro && hpFrac > b.P.PracAggroHP && d < b.P.PracAggroD {
 		return true
 	}
 	if t.HP < 0.4*t.MaxHP && hpFrac > 0.6 && d < 150 {
@@ -1044,7 +1064,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
-	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter {
+	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase {
 		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro)) {
 				continue

@@ -12,41 +12,54 @@ import (
 
 // Params are the tunable knobs (so variants can be compared in the simulator).
 type Params struct {
-	Name          string
-	EngageRatio   float64 // fight when myTTK < ratio * theirTTK
-	RetreatHP     float64 // fraction of max HP below which we break off
-	ReengageHP    float64
-	PrefRangeGun  float64
-	PrefRangeLas  float64
-	PrefRangeLtn  float64
-	JukeMin       float64
-	JukeMax       float64
-	WExpo         float64
-	WAtk          float64
-	WGoal         float64
-	WRange        float64
-	Aggressive    bool    // attack any mech on sight
-	HuntPassive   bool    // seek out enemies when healthy
-	HuntAfter     float64 // start hunting only after this match time
-	FarmNPC       bool
-	UseDrops      bool
-	DropGunForLas bool
-	DropGunForLtn bool // with a laser in hand, trade the gun for lightning
-	UpgradePrio   []string
-	WeaponRank    map[string]float64
-	LeadScale     float64
-	Roof          bool
-	NoDodge       bool
-	NoAdapt       bool
-	PracNoPeek    bool // in practice (squad) matches, skip the laser-timing caution
-	PracNearFarm  bool // in practice matches, only farm what is close
-	PracAggro     bool // in practice matches, attack any mech on sight while healthy
-	NoPeek        bool // ignore enemy laser timing (old behaviour)
-	Still         bool // test: never move
-	NoFire        bool // test: never shoot
+	Name            string
+	EngageRatio     float64 // fight when myTTK < ratio * theirTTK
+	RetreatHP       float64 // fraction of max HP below which we break off
+	ReengageHP      float64
+	PrefRangeGun    float64
+	PrefRangeLas    float64
+	PrefRangeLtn    float64
+	JukeMin         float64
+	JukeMax         float64
+	WExpo           float64
+	WAtk            float64
+	WGoal           float64
+	WRange          float64
+	Aggressive      bool    // attack any mech on sight
+	HuntPassive     bool    // seek out enemies when healthy
+	HuntAfter       float64 // start hunting only after this match time
+	FarmNPC         bool
+	UseDrops        bool
+	DropGunForLas   bool
+	DropGunForLtn   bool // with a laser in hand, trade the gun for lightning
+	UpgradePrio     []string
+	WeaponRank      map[string]float64
+	LeadScale       float64
+	Roof            bool
+	NoDodge         bool
+	NoAdapt         bool
+	PracNoPeek      bool     // in practice (squad) matches, skip the laser-timing caution
+	PracNearFarm    bool     // in practice matches, only farm what is close
+	PracAggro       bool     // in practice matches, attack any mech on sight while healthy
+	PracRetreatHP   float64  // retreat threshold in practice matches (<0: same as RetreatHP)
+	PracBerserk     bool     // in practice matches always take the fight
+	PracFarmCubes   int      // in practice matches avoid mechs until we hold this many cubes ...
+	PracFarmT       float64  // ... or this much time has passed
+	PracAggroD      float64  // range of the practice attack-on-sight rule
+	PracAggroHP     float64  // health needed for it
+	PracUpgradePrio []string // upgrade order in practice matches (empty: UpgradePrio)
+	NoPeek          bool     // ignore enemy laser timing (old behaviour)
+	Still           bool     // test: never move
+	NoFire          bool     // test: never shoot
 }
 
 func DefaultParams() Params {
+	p := baseParams()
+	ApplyProfile(&p, Profile)
+	return p
+}
+
+func baseParams() Params {
 	return Params{
 		Name: "paw", EngageRatio: 1.0, RetreatHP: 0.35, ReengageHP: 0.8,
 		PrefRangeGun: 130, PrefRangeLas: 140, PrefRangeLtn: 30,
@@ -57,7 +70,7 @@ func DefaultParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true,
+		PracNoPeek: true, PracNearFarm: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
 		Roof: true,
 	}
 }
@@ -206,6 +219,7 @@ type Bot struct {
 	lasCrate      bool
 	coverNear     bool // last steer found a spot hidden from the target close by
 	practice      bool // looks like a squad match (see perceive)
+	farmPhase     bool
 	sawOtherDeath bool
 	hop           *geo.Exit // jet hop in progress (or being walked to)
 	hopFly        bool
