@@ -317,6 +317,16 @@ func Variant(name string) Params {
 		p.QuietNoAim = true
 	case "nobreak":
 		p.NoBreak = true
+	case "noaim60":
+		p.QuietNoAim, p.QuietT = true, 60
+	case "noaim90":
+		p.QuietNoAim, p.QuietT = true, 90
+	case "ffa0na90":
+		p.FFA0, p.QuietNoAim, p.QuietT = "always", true, 90
+	case "ffa0na120":
+		p.FFA0, p.QuietNoAim, p.QuietT = "always", true, 120
+	case "ffa0q90":
+		p.FFA0, p.QuietT = "always", 90
 	case "nobossfar":
 		p.BossFarD = 0
 	case "bossfar110":
