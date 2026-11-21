@@ -76,7 +76,7 @@ func baseParams() Params {
 		UpgradePrio: []string{"plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
 			"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
-		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
+		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
 		PracNoPeek: true, PracNearFarm: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
 		Roof: true,
