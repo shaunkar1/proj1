@@ -57,7 +57,7 @@ func DefaultParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true,
+		PracNoPeek: true, PracNearFarm: true, PracAggro: true,
 		Roof: true,
 	}
 }
