@@ -58,6 +58,8 @@ func Variant(name string) Params {
 		p.NoDodge = true
 	case "nododge":
 		p.NoDodge = true
+	case "noroof":
+		p.Roof = false
 	case "r95":
 		p.PrefRangeGun = 95
 	case "ltn":

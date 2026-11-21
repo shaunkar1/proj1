@@ -52,6 +52,7 @@ func DefaultParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 1, "gun": 0.5},
 		LeadScale:  1.0,
+		Roof:       true,
 	}
 }
 
@@ -185,6 +186,13 @@ type Bot struct {
 	roamGoal   [2]float64
 	roamT      float64
 	blockedC   map[int]float64
+	objID      int
+	objT       float64
+	climbID    int
+	climbT     float64
+	climbPos   [3]float64
+	climbFrom  [2]float64
+	spawnYaw   float64
 	zonePathT  float64
 	zonePathG  [2]float64
 	zonePathC  float64
@@ -203,6 +211,7 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b.targetID = -1
 	b.lastDmgBy = -1
 	b.lastDmgT = -100
+	b.climbID = -1
 	b.zonePathT = -100
 	b.prevAlive = int(h.Config.Match.Mechs)
 	if b.prevAlive == 0 {
@@ -429,6 +438,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 // Act is the per-decision entry point.
 func (b *Bot) Act(o *proto.Obs) proto.Action {
 	b.perceive(o)
+	if o.Tick <= 1 {
+		b.spawnYaw = o.Self.Aim[0]
+	}
 	act := proto.Action{Tick: o.Tick}
 	act.Aim = b.cmdAim
 	if o.Tick <= 1 && b.cmdAim == ([2]float64{}) {

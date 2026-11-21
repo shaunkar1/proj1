@@ -32,7 +32,11 @@ func (b *Bot) enemyDps(t *Track, d float64) float64 {
 		}
 	}
 	if t.has[2] && d < b.cfg.Weapons["laser"].Range {
-		dps += 125
+		if b.holds("lightning") && d < 42 && b.me.Energy > 15 {
+			dps += 20 // our arcs keep its laser offline
+		} else {
+			dps += 125
+		}
 	}
 	if t.has[3] && d < b.cfg.Weapons["lightning"].Range+4 {
 		dps += 230
@@ -441,11 +445,32 @@ func (b *Bot) decide(act *proto.Action) {
 			case "crate":
 				farm = ob.item
 				ctx.arrive = 14
+				cp := [3]float64{ob.item.Pos[0], ob.item.Pos[1], ob.item.Pos[2] + 1.2}
+				if !b.w.Clear(b.muz[0], b.muz[1], b.muz[2], cp[0], cp[1], cp[2]) {
+					ctx.arrive = 3 // no line on it from here: walk up to it
+				}
+				if b.objID != ob.item.ID {
+					b.objID, b.objT = ob.item.ID, b.t
+				} else if b.t-b.objT > 14 {
+					ob.item.Bad = b.t + 90 // taking too long: forget it for a while
+				}
 			case "npc":
 				farmNPC = ob.trk
 				ctx.arrive = 22
 				ctx.target = ob.trk
 				ctx.strafe = true
+			case "roof":
+				ctx.arrive = 1.2
+				need := (ob.item.Pos[2]-me.Pos[2])/8.0*me.Stats.JetDrain + 12
+				if hyp(goal[0], goal[1], px, py) < 2.6 && me.Grounded && me.Energy >= need && b.climbID < 0 {
+					b.climbID = ob.item.ID
+					b.climbT = b.t
+					b.climbPos = ob.item.Pos
+					b.climbFrom = [2]float64{px, py}
+				}
+				if hyp(goal[0], goal[1], px, py) < 30 {
+					ctx.boost = false // arrive with a full tank
+				}
 			case "hunt":
 				ctx.arrive = 30
 			case "drop":
@@ -453,7 +478,7 @@ func (b *Bot) decide(act *proto.Action) {
 			default:
 				ctx.arrive = 1.0
 			}
-			if me.Energy > 75 && hyp(goal[0], goal[1], px, py) > 40 {
+			if me.Energy > 75 && hyp(goal[0], goal[1], px, py) > 40 && ob.kind != "roof" {
 				ctx.boost = true
 			}
 		} else {
@@ -476,7 +501,37 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	var mx, my float64
 	var boost bool
-	if b.t < b.unstickT {
+	climbing := false
+	if b.climbID >= 0 {
+		it := b.pickups[b.climbID]
+		onRoof := me.Grounded && math.Abs(me.Pos[2]-b.climbPos[2]) < 1.6
+		switch {
+		case it == nil, b.t-b.climbT > 11, underFire, mode == "fight", mode == "retreat", zoneUrgent,
+			!onRoof && me.Energy < 2 && me.Vel[2] <= 0 && b.t-b.climbT > 1:
+			if it != nil {
+				it.Bad = b.t + 45
+			}
+			b.climbID = -1
+		default:
+			climbing = true
+			dx, dy := b.climbPos[0]-px, b.climbPos[1]-py
+			l := math.Max(math.Hypot(dx, dy), 0.01)
+			mx, my = dx/l, dy/l
+			if l < 1.0 {
+				mx, my = mx*l, my*l
+			}
+			if !onRoof {
+				if me.Grounded {
+					act.Jump = true
+				}
+				boost = me.Pos[2] < b.climbPos[2]+1.0
+			}
+			mode = "climb"
+		}
+	}
+	if climbing {
+		b.stuckT = 0
+	} else if b.t < b.unstickT {
 		mx, my = b.unstickDir[0], b.unstickDir[1]
 		boost = true
 		if me.Grounded {
@@ -504,7 +559,7 @@ func (b *Bot) decide(act *proto.Action) {
 	} else {
 		mx, my, boost = b.steer(ctx)
 	}
-	if !me.Grounded && b.t >= b.unstickT {
+	if !me.Grounded && b.t >= b.unstickT && !climbing {
 		// in the air without wanting to be: no jets
 		boost = false
 	}
@@ -744,12 +799,36 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		consider(objective{kind: "cube", pos: it.Pos, value: 85, item: it})
 	}
 	for _, it := range b.pickupL {
-		if (it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3) || b.t < it.Bad {
+		if b.t < it.Bad {
 			continue
 		}
-		if v := b.wantPickup(it); v > 0 {
-			consider(objective{kind: "weapon", pos: it.Pos, value: 70 + 45*v, item: it})
+		v := b.wantPickup(it)
+		if v <= 0 {
+			continue
 		}
+		val := 70 + 45*v
+		if b.slot1Rank() == 0 {
+			val = 200 + 30*v // a second weapon decides fights: get one first
+		}
+		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 {
+			// on a roof: climb for it when it is reachable and nobody is around
+			h := it.Pos[2] - me.Pos[2]
+			need := h/8.0*me.Stats.JetDrain + 12
+			if !b.P.Roof || enemiesNear || hpFrac < 0.6 || h < 0 || need > me.MaxEnergy*0.9 {
+				continue
+			}
+			c := b.w.Nav.Nearest(it.Pos[0], it.Pos[1], 30)
+			if c < 0 {
+				continue
+			}
+			ax, ay := b.w.Nav.Pos(c)
+			if hyp(ax, ay, it.Pos[0], it.Pos[1]) > 22 {
+				continue
+			}
+			consider(objective{kind: "roof", pos: [3]float64{ax, ay, me.Pos[2]}, value: val - h*2.5 - 25, item: it})
+			continue
+		}
+		consider(objective{kind: "weapon", pos: it.Pos, value: val, item: it})
 	}
 	if hpFrac > 0.45 {
 		for _, it := range b.crateL {
@@ -829,6 +908,10 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		base = math.Atan2(act.Move[1], act.Move[0])
 	}
 	switch {
+	case b.t < 1.7:
+		// first look: one full turn to find weapons and crates nearby
+		act.Aim = [2]float64{angDiff(b.spawnYaw+me.Stats.TurnRate*(b.t+0.3), 0), 0}
+		return
 	case b.t-b.lastDmgT < 2.5:
 		act.Aim = [2]float64{b.lastDmgDir, 0}
 		return
