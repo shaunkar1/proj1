@@ -559,7 +559,7 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.target = tgt
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
-	case boss != nil && (bossD < 150 || (boss.LOS && b.t-boss.Seen < 1.5)) && !(tgt == boss && finishing):
+	case boss != nil && (bossD < b.P.BossAvoidD || (boss.LOS && b.t-boss.Seen < 1.5 && bossD < b.P.BossSeenD)) && !(tgt == boss && finishing):
 		// outclassed: break its line and open the distance; shoot only if it costs nothing
 		mode = "avoid"
 		sp := b.findSafe(threats)
@@ -1302,7 +1302,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if bo := b.boss; bo != nil {
 			// nothing is worth walking toward the strongest mech around
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
-			if db < 160 || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
+			if db < b.P.BossObjD || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
 				return
 			}
 		}
