@@ -1194,6 +1194,10 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 	if b.isPrey(t, d, hpFrac) {
 		return true
 	}
+	if b.isOpening(t, d, hpFrac) {
+		t.Hostile = math.Max(t.Hostile, b.t+8)
+		return true
+	}
 	if b.isBlind(t, d, hpFrac) {
 		t.Hostile = math.Max(t.Hostile, b.t+6)
 		return true
@@ -1757,6 +1761,30 @@ func (b *Bot) isBlind(t *Track, d, hpFrac float64) bool {
 		return true
 	}
 	return false
+}
+
+// isOpening: in recorded matches whoever landed the first laser hit took a quarter
+// of the damage it dealt, and a mech already fighting someone else died four times
+// in five when a third joined in. So strike first when nobody is on us.
+func (b *Bot) isOpening(t *Track, d, hpFrac float64) bool {
+	if !b.P.Open || !b.ffaSure || b.practice || t.NPC || t.Ghost || !t.LOS || b.t-t.Seen > 0.3 || hpFrac < b.P.OpenHP || b.boss != nil {
+		return false
+	}
+	if b.t-b.lastDmgT < 3 {
+		return false
+	}
+	for _, o := range b.trackL {
+		if o != t && !o.NPC && b.t < o.Hostile && b.t-o.Seen < 3 {
+			return false
+		}
+	}
+	if b.dangerRatio(t) > b.P.OpenRatio {
+		return false
+	}
+	if las, _ := b.weapon("laser"); las != nil && !b.P.NoOpenLas && d > 25 && d < las.Stats.Range-25 {
+		return true
+	}
+	return b.t-t.busyT < 3 && d < b.P.OpenBusyD
 }
 
 // isPrey: a mech we clearly outclass (kills are the main source of cubes).
