@@ -47,6 +47,7 @@ type Params struct {
 	PracFarmT       float64 // ... or this much time has passed
 	PracAggroD      float64 // range of the practice attack-on-sight rule
 	PracAggroHP     float64 // health needed for it
+	NoChaserRule    bool    // old behaviour: charge the laser even with a lightning carrier closing
 	NoRetreatCubes  bool    // old behaviour: ignore cubes while retreating
 	OpenCost        float64 // extra path cost for open ground far from buildings (0: off)
 	NPCValue        float64 // objective value of a drone (two cubes)

@@ -79,6 +79,14 @@ func ApplyProfile(p *Params, name string) {
 		p.PracBerserk = true
 		p.PracRetreatHP = 0
 		p.PracRange = 150
+	case "farm4":
+		p.PracAggro = true
+		p.PracFarmCubes = 4
+		p.PracFarmT = 50
+	case "farm6":
+		p.PracAggro = true
+		p.PracFarmCubes = 6
+		p.PracFarmT = 75
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220

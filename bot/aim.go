@@ -299,7 +299,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 				}
 				shot = true
 			}
-		} else if las.Cooldown <= 0.11 && inRange && (t.LOS || b.t-t.Seen < 1.0) && !t.NPC {
+		} else if las.Cooldown <= 0.11 && inRange && (t.LOS || b.t-t.Seen < 1.0) && !t.NPC && !b.chaserClose(t, d) {
 			act.Fire[li] = true
 			shot = shot || t.LOS
 		} else if las.Cooldown <= 0.11 && inRange && t.LOS && t.NPC && t.HP > 150 {
@@ -374,4 +374,20 @@ func (b *Bot) laserPoint(t *Track, hgt float64) (pt [3]float64, ok, tight bool) 
 		}
 	}
 	return pt, false, false
+}
+
+// chaserClose: a lightning carrier closing inside the distance it can cover
+// while we stand at half speed charging. Starting a charge there walks us into
+// its arc (which also shorts the laser); the gun keeps us at full speed.
+func (b *Bot) chaserClose(t *Track, d float64) bool {
+	if b.P.NoChaserRule || !t.has[3] || d > 68 || d < 46 {
+		return false
+	}
+	dx, dy := b.me.Pos[0]-t.Pos[0], b.me.Pos[1]-t.Pos[1]
+	l := math.Hypot(dx, dy)
+	if l < 1 {
+		return false
+	}
+	closing := (t.Vel[0]*dx + t.Vel[1]*dy) / l
+	return closing > 4
 }
