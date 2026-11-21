@@ -338,7 +338,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 
-	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
+	b.farmPhase = b.P.PracFarmCubes > 0 && b.practice && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
 	// ---- someone far stronger than us nearby: keep out of its sight
 	b.boss = nil
 	bossD := 1e9
