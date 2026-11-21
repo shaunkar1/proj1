@@ -177,6 +177,14 @@ func Variant(name string) Params {
 		p.NoExplore = false
 		p.NoLaserRush = true
 		p.IdleXUnarmed = true
+	case "hot10":
+		p.BossHot = 1.0
+	case "hot12":
+		p.BossHot = 1.2
+	case "hot15":
+		p.BossHot = 1.5
+	case "noroofbold":
+		p.RoofBold = false
 	case "sites":
 		p.Sites = true
 	case "sites2":

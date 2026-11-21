@@ -73,6 +73,8 @@ type Params struct {
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
+	RoofBold        bool     // climb for a weapon on a roof unless an enemy is close; take a near weapon even while repairing
+	BossHot         float64  // a mech that is hitting us only counts as one to avoid above this ratio (0: same as BossRatio)
 	IdleXUnarmed    bool     // with exploring on: only head for unseen ground while we hold no laser
 	Sites           bool     // walk to where mechs died (heard) to collect the cubes they dropped
 	SiteFar         float64  // distance assumed for a death heard in the far band
@@ -105,7 +107,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 0.85, Sites: true, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 0.85, Sites: true, RoofBold: true, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
