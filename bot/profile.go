@@ -13,7 +13,7 @@ const Profile = "f75a220+g+s+x1"
 func ApplyProfile(p *Params, name string) {
 	if len(name) > 6 && name[:6] == "probe:" {
 		p.Probe = name[6:]
-		name = "f75a220"
+		name = "f75a220+g+s"
 	}
 	var mods []string
 	if i := strings.IndexByte(name, '+'); i >= 0 {

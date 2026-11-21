@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -747,6 +748,12 @@ func (b *Bot) ffaAtStart() bool {
 // probeStop: measurement builds go idle under a condition, so the score reveals
 // something about the matches the scorer runs.
 func (b *Bot) probeStop() bool {
+	if len(b.P.Probe) > 1 && b.P.Probe[0] == 't' {
+		// stop at a set time: the score is then the kills made by that time
+		if v, err := strconv.Atoi(b.P.Probe[1:]); err == nil {
+			return b.t >= float64(v)
+		}
+	}
 	switch b.P.Probe {
 	case "slot":
 		return b.kills >= b.slot
