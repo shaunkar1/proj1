@@ -115,6 +115,7 @@ type Params struct {
 	FFADropWait     float64  // ... once it has lain there this long
 	FFADrop         float64  // free-for-all: same below this health fraction, when nobody else is at the drop
 	RngSalt         int      // shifts the random stream (juke timing and the like)
+	MoveJit         int      // squad matches: turn every move command by up to a degree, in a pattern picked by this number (0: off)
 	FFA0            string   // start-of-match free-for-all test (see ffaAtStart)
 	Grab            float64  // weapon within this many metres is fetched before anything else (0 = off)
 	GrabCube        float64  // same for a cube this close
@@ -783,6 +784,18 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		act.Aim = o.Self.Aim
 	}
 	b.decide(&act)
+	if b.P.MoveJit != 0 && !b.ffaSure && (act.Move[0] != 0 || act.Move[1] != 0) {
+		// a different but equally good run of the same match: same decisions, steps a hair to one side
+		x := uint64(b.P.MoveJit)*0x9E3779B97F4A7C15 + uint64(o.Tick)*0xBF58476D1CE4E5B9 + uint64(int64(b.seed))*0x94D049BB133111EB + uint64(b.slot)
+		x ^= x >> 30
+		x *= 0xBF58476D1CE4E5B9
+		x ^= x >> 27
+		x *= 0x94D049BB133111EB
+		x ^= x >> 31
+		a := (float64(x%2001)/1000 - 1) * math.Pi / 180
+		c, s := math.Cos(a), math.Sin(a)
+		act.Move = proto.Vec2{act.Move[0]*c - act.Move[1]*s, act.Move[0]*s + act.Move[1]*c}
+	}
 	if b.P.Still {
 		act.Move = proto.Vec2{}
 		act.Jump = false
