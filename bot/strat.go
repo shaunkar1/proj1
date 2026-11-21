@@ -810,7 +810,7 @@ func (b *Bot) decide(act *proto.Action) {
 				switch {
 				case it.wdT == 0 || d < it.wdD-5:
 					it.wdT, it.wdD = b.t, d
-				case b.t-it.wdT > 7:
+				case b.t-it.wdT > 14:
 					it.Bad = b.t + 60
 					it.wdT = 0
 				}
