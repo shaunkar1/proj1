@@ -39,6 +39,8 @@ func ApplyProfile(p *Params, name string) {
 				p.PracLtnRank = 3.4
 			case m[0] == 'p':
 				p.PracRange = v
+			case m[0] == 'd':
+				p.PracDrop = v / 100
 			case m[0] == 'x':
 				p.RngSalt = int(v)
 			case m[0] == 't':

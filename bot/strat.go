@@ -603,6 +603,23 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 	}
+	// squad matches: a landed supply drop is a full repair in the middle of the brawl
+	var dropGo *proto.DropObs
+	if b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop {
+		bd := b.P.PracDropD
+		for i := range o.Drops {
+			d := &o.Drops[i]
+			dist := hyp(px, py, d.Pos[0], d.Pos[1])
+			if dist >= bd || zEnd.outside(d.Pos[0], d.Pos[1]) > -4 {
+				continue
+			}
+			// set out so as to arrive as it lands, not to wait in the open
+			if dist/me.Stats.WalkSpeed+3 < d.LandsIn {
+				continue
+			}
+			bd, dropGo = dist, d
+		}
+	}
 	switch {
 	case zoneUrgent:
 		mode = "zone"
@@ -614,6 +631,14 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.target = tgt
 			ctx.strafe = false
 		}
+	case dropGo != nil:
+		mode = "drop"
+		goal, hasGoal = [2]float64{dropGo.Pos[0], dropGo.Pos[1]}, true
+		ctx.arrive = 2
+		ctx.wGoal = 4
+		ctx.mustMove = hyp(px, py, dropGo.Pos[0], dropGo.Pos[1]) > 4
+		ctx.boost = me.Energy > 8 && hyp(px, py, dropGo.Pos[0], dropGo.Pos[1]) > 12
+		ctx.target = tgt
 	case grab != nil:
 		mode = "grab"
 		goal, hasGoal = [2]float64{grab.Pos[0], grab.Pos[1]}, true
