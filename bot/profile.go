@@ -31,6 +31,14 @@ func ApplyProfile(p *Params, name string) {
 				p.GrabAlways = true
 			case m == "s":
 				p.ScanAlways = true
+			case m == "ul":
+				p.PracUpgradePrio = ltnFirst
+			case m == "ud":
+				p.PracUpgradePrio = dmgFirst
+			case m == "ltn":
+				p.PracLtnRank = 3.4
+			case m[0] == 'p':
+				p.PracRange = v
 			case m[0] == 't':
 				p.PracFarmT = v
 			case m[0] == 'c':
@@ -345,6 +353,10 @@ func ApplyProfile(p *Params, name string) {
 		p.PracAggroHP = 0.45
 	}
 }
+
+var ltnFirst = []string{"lightning_efficiency", "lightning_chain", "plating", "armor", "capacitor", "reactor", "nanites", "gun_damage", "gun_rate",
+	"laser_damage", "laser_charge", "lightning_range", "servos", "gyros", "gun_mag", "mortar_reload", "mortar_splash",
+	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
 
 var dmgFirst = []string{"laser_damage", "gun_damage", "gun_rate", "laser_charge", "plating", "armor", "nanites", "lightning_efficiency",
 	"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
