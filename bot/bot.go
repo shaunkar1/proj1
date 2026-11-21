@@ -318,6 +318,8 @@ type Bot struct {
 	wallTick      []int
 	wallMed       float64 // ms between observations early in the match (median, minimum); 0 = not measured
 	wallMin       float64
+	readyAt       time.Time // when we were ready; and how long the first observation then took (ms)
+	readyGap      float64
 	shyMoveT      float64
 	shyMoveG      [2]float64
 	safeSpot      [2]float64
@@ -398,6 +400,7 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	if b.prevAlive == 0 {
 		b.prevAlive = 16
 	}
+	b.readyAt = time.Now()
 	return b
 }
 
@@ -739,6 +742,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 
 // Act is the per-decision entry point.
 func (b *Bot) Act(o *proto.Obs) proto.Action {
+	if b.wallOn && b.readyGap == 0 {
+		b.readyGap = math.Max(float64(time.Since(b.readyAt).Microseconds())/1000, 0.01)
+	}
 	if b.wallOn && b.wallMed == 0 {
 		b.wallClock(o)
 	}
@@ -830,6 +836,10 @@ func (b *Bot) probeStop() bool {
 		if v, err := strconv.Atoi(b.P.Probe[2:]); err == nil {
 			return b.wallMed > float64(v)
 		}
+	}
+	if b.P.Probe == "tm" {
+		// ... or when either clock looks unlike a quiet server: slow ticks, or a long wait for the first one
+		return b.wallMed > 4 || b.readyGap > 150
 	}
 	switch b.P.Probe {
 	case "slot":
@@ -933,6 +943,15 @@ func (b *Bot) wallClock(o *proto.Obs) {
 	}
 	sort.Float64s(d)
 	b.wallMed, b.wallMin = math.Max(d[len(d)/2], 0.01), math.Max(d[0], 0.01)
+}
+
+// gapCode is wallCode in whole octaves (1/16 ms to 32 s).
+func gapCode(ms float64) float64 {
+	if ms <= 0 {
+		return 0
+	}
+	k := math.Round(math.Log2(ms))
+	return 0.03 * (math.Max(-4, math.Min(15, k)) + 5)
 }
 
 // wallCode turns milliseconds into a torso pitch: 0.03 rad per half octave, 0.15 rad = 1 ms.
