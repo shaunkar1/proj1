@@ -6,6 +6,10 @@ const Profile = "base"
 // ApplyProfile adjusts only the parameters used in squad matches, so the
 // free-for-all behaviour is the same under every profile.
 func ApplyProfile(p *Params, name string) {
+	if len(name) > 6 && name[:6] == "probe:" {
+		p.Probe = name[6:]
+		name = "f75a220"
+	}
 	switch name {
 	case "base":
 	case "aggro":

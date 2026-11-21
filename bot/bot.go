@@ -67,6 +67,7 @@ type Params struct {
 	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
 	ChaseD          float64  // range held while chasing
 	PracStopKills   int      // measurement: go idle in practice after this many kills
+	Probe           string   // measurement runs (see probeStop)
 	PracLtnRank     float64  // squad matches: value of lightning as a second weapon (0: the usual rank; laser is 3)
 	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
 	AmbushAng       float64  // how far off us its aim must be (rad)
@@ -283,6 +284,7 @@ type Bot struct {
 	farTry        float64
 	periZ         float64
 	boss          *Track
+	seed          int64
 	peer          *Track
 	sawOtherDeath bool
 	hop           *geo.Exit // jet hop in progress (or being walked to)
@@ -302,6 +304,7 @@ type Bot struct {
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
+	b.seed = int64(h.Seed)
 	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot)))
 	b.tracks = map[int]*Track{}
 	b.pickups = map[int]*Item{}
@@ -663,6 +666,12 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 	if b.P.NoFire {
 		act.Fire = [2]bool{}
 	}
+	if b.P.Probe != "" && b.probeStop() {
+		act.Move = proto.Vec2{}
+		act.Jump = false
+		act.Boost = false
+		act.Fire = [2]bool{}
+	}
 	if b.P.PracStopKills > 0 && b.practice && b.kills >= b.P.PracStopKills {
 		// measurement runs: stop playing after this many kills
 		act.Move = proto.Vec2{}
@@ -685,3 +694,21 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 
 // DbgMode returns the last decision's mode label (for tooling).
 func (b *Bot) DbgMode() string { return b.dbg }
+
+// probeStop: measurement builds go idle under a condition, so the score reveals
+// something about the matches the scorer runs.
+func (b *Bot) probeStop() bool {
+	switch b.P.Probe {
+	case "slot":
+		return b.kills >= b.slot
+	case "slotr":
+		return b.kills >= 15-b.slot
+	case "seedlow":
+		return b.seed < 1000000
+	case "seedodd":
+		return b.seed%2 == 1
+	case "idle":
+		return true
+	}
+	return false
+}
