@@ -77,9 +77,9 @@ type Params struct {
 	OpenHP          float64
 	OpenBusyD       float64
 	NoOpenLas       bool
-	KeepAwayD       float64  // free-for-all: skip errands this close to a mech at least KeepAwayRatio as strong as us (0 = off)
+	KeepAwayD       float64 // free-for-all: skip errands this close to a mech at least KeepAwayRatio as strong as us (0 = off)
 	KeepAwayRatio   float64
-	KeepAwayAlive   int      // ... while more than this many are alive
+	KeepAwayAlive   int     // ... while more than this many are alive
 	QuietT          float64 // free-for-all: for this long treat every mech as one to keep away from (0 = off)
 	QuietAlways     bool    // ... also before the match is known to be a free-for-all
 	QuietHide       bool    // quiet time also sends us to cover from anyone in view (else it only filters what we walk to)
