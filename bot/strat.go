@@ -355,7 +355,7 @@ func (b *Bot) decide(act *proto.Action) {
 	if !b.ffaSure && !b.P.NoLegacy {
 		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false, false}
 	}
-	if b.P.QuietT > 0 && b.t < b.P.QuietT && (b.ffaSure || b.P.QuietAlways) && !b.practice {
+	if b.P.QuietT > 0 && b.t < b.P.QuietT && (b.ffaSure || (b.P.QuietAlways && (b.P.ShyT0 <= 0 || b.t < b.P.ShyT0))) && !b.practice {
 		// recorded matches: mechs that stayed out of every exchange for the first 75 s finished
 		// 5th on average, those drawn in within 15 s finished 9th-10th - and they started just as
 		// close to their neighbours. Early on, keep away from everyone and out of their sight.
@@ -801,8 +801,13 @@ func (b *Bot) decide(act *proto.Action) {
 		if ob == nil && !hurt && b.quiet && b.P.ShyRoam && !b.P.QuietHide && (b.ffaSure || !b.P.NoShyRoam0) {
 			// early and nothing safe to do: the circle can wait, the crowd is in the middle
 			mode = "shy"
-			goal, hasGoal = b.shySpot(), true
-			ctx.arrive = 3
+			if !b.ffaSure && b.P.ShyMove0 {
+				goal, hasGoal = b.shyMove(zEnd), true
+				ctx.arrive = 6
+			} else {
+				goal, hasGoal = b.shySpot(), true
+				ctx.arrive = 3
+			}
 		} else if zoneGo && ob == nil {
 			mode = "zone"
 			goal, hasGoal = zoneGoal, true
@@ -1497,25 +1502,45 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				return
 			}
 		}
+		shyPen := 0.0
 		if b.quiet && !b.P.QuietHide {
+			soft := !b.ffaSure && b.P.ShySoft0 > 0
 			// do the work that does not take us toward anybody
 			for _, t := range b.trackL {
-				if !b.ffaSure && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
+				if !b.ffaSure && !soft && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
 					break
 				}
 				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
 					continue
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+				if soft {
+					if c := hyp(px, py, t.Pos[0], t.Pos[1]) - db; db < b.P.ShyFarD && c > shyPen {
+						shyPen = c
+					}
+					continue
+				}
 				if db < b.P.QuietObjD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
 					return
+				}
+			}
+			if soft {
+				for i := range b.noise {
+					n := &b.noise[i]
+					if b.t-n.t > 12 {
+						continue
+					}
+					db := hyp(ob.pos[0], ob.pos[1], n.pos[0], n.pos[1])
+					if c := hyp(px, py, n.pos[0], n.pos[1]) - db; db < b.P.ShyFarD && c > shyPen {
+						shyPen = c
+					}
 				}
 			}
 			wantLas := (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && d <= b.P.ShyLaserD
 			if b.P.ShyWeapon0 && !b.ffaSure && (ob.kind == "weapon" || ob.kind == "roof") {
 				wantLas = true
 			}
-			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas {
+			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas && !soft {
 				// ... nor toward anybody heard: on average we walked 66 m toward the mech that
 				// then hit us first, and it had started 200 m away
 				for i := range b.noise {
@@ -1553,7 +1578,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.practice && b.P.PracNearFarm {
 			k = 1.3 // hunters are coming to us: do not wander off for loot
 		}
-		s := ob.value - d*k
+		s := ob.value - d*k - shyPen*b.P.ShySoft0
 		if ob.kind == b.lastObjKind && hyp(ob.pos[0], ob.pos[1], b.lastObjPos[0], b.lastObjPos[1]) < 3 {
 			s += 15 // finish what we started
 		}
@@ -1767,6 +1792,55 @@ func (b *Bot) shySpot() [2]float64 {
 	return b.shyGoal
 }
 
+// shyMove is where to walk on to when nothing may be done here: unseen ground away from everybody.
+func (b *Bot) shyMove(zEnd zoneC) [2]float64 {
+	me := b.me
+	px, py := me.Pos[0], me.Pos[1]
+	if b.t < b.shyMoveT && hyp(b.shyMoveG[0], b.shyMoveG[1], px, py) > 10 {
+		return b.shyMoveG
+	}
+	var oth [][2]float64
+	for _, t := range b.trackL {
+		if !t.NPC && !t.Ghost && b.t-t.Seen < 12 {
+			oth = append(oth, [2]float64{t.Pos[0], t.Pos[1]})
+		}
+	}
+	for i := range b.noise {
+		if b.t-b.noise[i].t < 12 {
+			oth = append(oth, b.noise[i].pos)
+		}
+	}
+	nv := b.w.Nav
+	best := [2]float64{px, py}
+	bs := math.Inf(-1)
+	for k := 0; k < 24; k++ {
+		a := float64(k) * math.Pi / 12
+		r := 70.0 + 30*float64(k%3)
+		x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+		if !nv.WalkableMain(x, y) || zEnd.outside(x, y) > -10 {
+			continue
+		}
+		m := 260.0
+		for _, o := range oth {
+			if d := hyp(x, y, o[0], o[1]); d < m {
+				m = d
+			}
+		}
+		s := m - 0.15*r
+		if len(b.seen) > 0 {
+			cx, cy := int((x-b.w.BMinX)/seenCell), int((y-b.w.BMinY)/seenCell)
+			if cx >= 0 && cy >= 0 && cx < b.seenW && cy < b.seenH && !b.seen[cy*b.seenW+cx] {
+				s += 40
+			}
+		}
+		if s > bs {
+			bs, best = s, [2]float64{x, y}
+		}
+	}
+	b.shyMoveG, b.shyMoveT = best, b.t+6
+	return best
+}
+
 // roam wanders inside the next circle, preferring spots away from the centre.
 func (b *Bot) roam(zEnd zoneC) [2]float64 {
 	me := b.me
@@ -1811,6 +1885,15 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 	case b.t < 1.7 || (b.P.Periscope > 0 && b.t < 3.3 && !me.Grounded):
 		// first look: one full turn to find weapons and crates nearby
 		act.Aim = [2]float64{angDiff(b.spawnYaw+me.Stats.TurnRate*(b.t+0.3), 0), 0}
+		if b.cfgN > 0 {
+			// the rules of this match are not the published ones: show it (torso pitch is free during the first look)
+			switch {
+			case b.t >= 0.3 && b.t < 0.9:
+				act.Aim[1] = 0.2 + 0.04*float64(b.cfgFirst)
+			case b.t >= 1.0 && b.t < 1.6:
+				act.Aim[1] = 0.2 + 0.04*math.Min(float64(b.cfgN), 20)
+			}
+		}
 		return
 	case b.t-b.lastDmgT < 2.5:
 		act.Aim = [2]float64{b.lastDmgDir, 0}

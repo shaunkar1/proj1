@@ -204,6 +204,7 @@ type Hello struct {
 		Files []string `json:"files"`
 	} `json:"map"`
 	Config Config `json:"config"`
+	Raw    []byte `json:"-"` // the line as received
 }
 
 type WeaponObs struct {

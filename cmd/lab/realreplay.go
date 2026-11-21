@@ -457,8 +457,21 @@ func main() {
 					bd, nc = d, id
 				}
 			}
-			fmt.Printf("%6.1f %-34s hp %4.0f ammo %2.0f rl %.1f mv(%+.1f,%+.1f) fire %v reload %v crate %d@%.0f vis(c%d q%d p%d m%d)%s%s pos(%.0f,%.0f,%.1f) en%.0f fl%.0f j%v b%v\n",
-				ts, b.Info(), mm[6], ammo, reload, act.Move[0], act.Move[1], act.Fire, act.Reload, nc, bd, len(o.Crates), len(o.Cubes), len(o.Pickups), len(o.Mechs), fired, realFire, mm[1], mm[2], mm[3], mm[7], mm[8], act.Jump, act.Boost)
+			if a := os.Getenv("ATT"); a != "" {
+				id, _ := strconv.Atoi(a)
+				if am := cur[id]; am != nil {
+					dx, dy := am[1]-mm[1], am[2]-mm[2]
+					dd := math.Hypot(dx, dy)
+					mv := math.Hypot(act.Move[0], act.Move[1])
+					c := 0.0
+					if mv > 0.2 && dd > 1 {
+						c = (act.Move[0]*dx + act.Move[1]*dy) / (mv * dd)
+					}
+					realFire += fmt.Sprintf(" ATT cos %+.2f d %.0f", c, dd)
+				}
+			}
+			fmt.Printf("%6.1f %-34s hp %4.0f ammo %2.0f rl %.1f mv(%+.1f,%+.1f) fire %v reload %v crate %d@%.0f vis(c%d q%d p%d m%d)%s%s\n",
+				ts, b.Info(), mm[6], ammo, reload, act.Move[0], act.Move[1], act.Fire, act.Reload, nc, bd, len(o.Crates), len(o.Cubes), len(o.Pickups), len(o.Mechs), fired, realFire)
 		}
 		for id, m := range cur {
 			prev[id] = m

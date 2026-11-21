@@ -89,6 +89,9 @@ type Params struct {
 	ShyNear0        float64 // before the match is known to be a free-for-all, errands shorter than this are always allowed
 	ShyLaserD       float64 // a laser this near is fetched whoever was heard (never past a mech in view)
 	ShyWeapon0      bool    // ... and so is every walk to a weapon
+	ShySoft0        float64 // > 0: before the free-for-all is known the filter only costs points (this many per metre closed) instead of forbidding
+	ShyT0           float64 // > 0: quiet time before the free-for-all is known ends this early
+	ShyMove0        bool    // ... and with nothing to do we walk on, away from everybody, over unseen ground, instead of standing
 	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
@@ -297,6 +300,10 @@ type Bot struct {
 	noise         []noiseSrc
 	shyGoal       [2]float64
 	shyT          float64
+	cfgFirst      int // hello differs from the kit's: first section, and how many (see cfgDiff)
+	cfgN          int
+	shyMoveT      float64
+	shyMoveG      [2]float64
 	safeSpot      [2]float64
 	safeT         float64
 	roamGoal      [2]float64
@@ -354,6 +361,7 @@ type Bot struct {
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
 	b.seed = int64(h.Seed)
+	b.cfgFirst, b.cfgN = cfgDiff(h.Raw)
 	if b.ffaAtStart() {
 		b.ffaSure, b.sawOtherDeath = true, true
 	}
