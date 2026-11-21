@@ -15,6 +15,7 @@ type Nav struct {
 	Walk   []bool
 	Hgt    []float32 // walking surface height
 	Cost   []float32 // extra cost for hugging obstacles
+	Adj    []uint8   // bit k set: the step to neighbour k is walkable
 	Comp   []int32   // connected component id (-1 blocked)
 	Main   int32     // id of the largest component
 	g      []float32
@@ -85,11 +86,8 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 						ok = false
 						break scan
 					}
-					th := float64(w.H[pc])
-					if th > h+2.4 {
-						ok = false
-						break scan
-					}
+					// terrain only matters under our centre (edges are checked
+					// separately); prisms need the full body clearance
 					for _, iv := range w.iv[w.off[pc]:w.off[pc+1]] {
 						if float64(iv.Top) > h+stepUp && float64(iv.Base) < h+bodyH {
 							ok = false
@@ -99,6 +97,53 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 				}
 			}
 			nv.Walk[c] = ok
+		}
+	}
+	// walkable steps between neighbours: each 1 m of the way must be gentler than the slope limit
+	nv.Adj = make([]uint8, n)
+	lim := math.Tan(48 * math.Pi / 180)
+	for j := 0; j < nv.H; j++ {
+		for i := 0; i < nv.W; i++ {
+			c := j*nv.W + i
+			if !nv.Walk[c] {
+				continue
+			}
+			x := nv.MinX + float64(i)*NavStep
+			y := nv.MinY + float64(j)*NavStep
+			for k, o := range nbrs {
+				ni, nj := i+o[0], j+o[1]
+				if ni < 0 || nj < 0 || ni >= nv.W || nj >= nv.H {
+					continue
+				}
+				nc := nj*nv.W + ni
+				if !nv.Walk[nc] {
+					continue
+				}
+				if o[0] != 0 && o[1] != 0 && (!nv.Walk[j*nv.W+ni] || !nv.Walk[nj*nv.W+i]) {
+					continue
+				}
+				ok := true
+				if nv.Hgt[c] == w.H[w.cell(x, y)] && nv.Hgt[nc] == w.H[w.cell(x+float64(o[0])*NavStep, y+float64(o[1])*NavStep)] {
+					// plain terrain on both ends: walk the segment in 1 m pieces
+					steps := 2
+					seg := math.Hypot(float64(o[0]), float64(o[1])) * NavStep / float64(steps)
+					prev := float64(nv.Hgt[c])
+					for sgm := 1; sgm <= steps; sgm++ {
+						t := float64(sgm) / float64(steps)
+						hh := w.Ground(x+float64(o[0])*NavStep*t, y+float64(o[1])*NavStep*t)
+						if math.Abs(hh-prev) > lim*seg+0.05 {
+							ok = false
+							break
+						}
+						prev = hh
+					}
+				} else if math.Abs(float64(nv.Hgt[c]-nv.Hgt[nc])) > stepUp {
+					ok = false // on or off a deck: at most one step
+				}
+				if ok {
+					nv.Adj[c] |= 1 << uint(k)
+				}
+			}
 		}
 	}
 	// obstacle-hugging cost: distance (in cells) to nearest blocked cell
@@ -172,42 +217,35 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 	w.Nav = nv
 }
 
-func (nv *Nav) edgeOK(a, b int, lim float32) bool {
-	d := nv.Hgt[a] - nv.Hgt[b]
-	if d < 0 {
-		d = -d
-	}
-	return d <= lim
-}
+var nbrs = [8][2]int{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}}
 
 func (nv *Nav) neighbors(c int, f func(nc int, cost float32)) {
-	ci, cj := c%nv.W, c/nv.W
-	for dj := -1; dj <= 1; dj++ {
-		for di := -1; di <= 1; di++ {
-			if di == 0 && dj == 0 {
-				continue
-			}
-			ni, nj := ci+di, cj+dj
-			if ni < 0 || nj < 0 || ni >= nv.W || nj >= nv.H {
-				continue
-			}
-			nc := nj*nv.W + ni
-			if !nv.Walk[nc] {
-				continue
-			}
-			if di != 0 && dj != 0 {
-				if !nv.Walk[cj*nv.W+ni] || !nv.Walk[nj*nv.W+ci] || !nv.edgeOK(c, nc, 2.6) {
-					continue
-				}
-				f(nc, 1.4142*(1+nv.Cost[nc]))
-			} else {
-				if !nv.edgeOK(c, nc, 2.0) {
-					continue
-				}
-				f(nc, 1+nv.Cost[nc])
-			}
+	a := nv.Adj[c]
+	if a == 0 {
+		return
+	}
+	for k := 0; k < 8; k++ {
+		if a&(1<<uint(k)) == 0 {
+			continue
+		}
+		nc := c + nbrs[k][1]*nv.W + nbrs[k][0]
+		if k&1 == 1 {
+			f(nc, 1.4142*(1+nv.Cost[nc]))
+		} else {
+			f(nc, 1+nv.Cost[nc])
 		}
 	}
+}
+
+// stepOK reports whether moving from cell a to the adjacent cell b is walkable.
+func (nv *Nav) stepOK(a, b int) bool {
+	d := b - a
+	for k := 0; k < 8; k++ {
+		if nbrs[k][1]*nv.W+nbrs[k][0] == d {
+			return nv.Adj[a]&(1<<uint(k)) != 0
+		}
+	}
+	return false
 }
 
 func (nv *Nav) Cell(x, y float64) int {
@@ -285,7 +323,7 @@ func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 		if c < 0 || !nv.Walk[c] {
 			return false
 		}
-		if prev >= 0 && c != prev && !nv.edgeOK(prev, c, 2.6) {
+		if prev >= 0 && c != prev && !nv.stepOK(prev, c) {
 			return false
 		}
 		prev = c
