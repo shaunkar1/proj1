@@ -153,7 +153,7 @@ func (b *Bot) tryTake(act *proto.Action) {
 	}
 	var best *Item
 	bv := 0.0
-	for _, it := range b.pickups {
+	for _, it := range b.pickupL {
 		if hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) > b.cfg.Loot.PickupRadius-0.4 || math.Abs(it.Pos[2]-me.Pos[2]) > 3.6 {
 			continue
 		}
@@ -202,7 +202,7 @@ func (b *Bot) decide(act *proto.Action) {
 	var mechs []*Track
 	incoming := 0.0
 	nHostile := 0
-	for _, t := range b.tracks {
+	for _, t := range b.trackL {
 		age := b.t - t.Seen
 		if t.NPC {
 			if age < 0.3 {
@@ -556,7 +556,7 @@ func (b *Bot) decide(act *proto.Action) {
 	healing := hpFrac < 0.85 && b.t-b.lastDmgT < 40
 	if !shot && shootT == nil && healing {
 		// keep still on the trigger: dealing damage restarts the repair timer
-		for _, t := range b.tracks {
+		for _, t := range b.trackL {
 			if t.NPC && t.LOS && b.t-t.Seen < 0.3 && b.t-t.HitMe < 2 {
 				shot = b.shootMech(act, t)
 				break
@@ -568,7 +568,7 @@ func (b *Bot) decide(act *proto.Action) {
 			shot = b.shootMech(act, farmNPC)
 		}
 		if !shot {
-			for _, t := range b.tracks {
+			for _, t := range b.trackL {
 				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
 					shot = b.shootMech(act, t)
 					break
@@ -582,7 +582,7 @@ func (b *Bot) decide(act *proto.Action) {
 			// opportunistic: any crate in easy reach
 			var bc *Item
 			bd := 75.0
-			for _, c := range b.crates {
+			for _, c := range b.crateL {
 				if c.Roof && c.Pos[2] > me.Pos[2]+25 {
 					continue
 				}
@@ -737,13 +737,13 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			best = &o
 		}
 	}
-	for _, it := range b.cubes {
+	for _, it := range b.cubeL {
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 || b.t < it.Bad {
 			continue
 		}
 		consider(objective{kind: "cube", pos: it.Pos, value: 85, item: it})
 	}
-	for _, it := range b.pickups {
+	for _, it := range b.pickupL {
 		if (it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3) || b.t < it.Bad {
 			continue
 		}
@@ -752,7 +752,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 	}
 	if hpFrac > 0.45 {
-		for _, it := range b.crates {
+		for _, it := range b.crateL {
 			if (it.Roof && it.Pos[2] > me.Pos[2]+3) || b.t < it.Bad {
 				continue
 			}
@@ -760,7 +760,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 	}
 	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear {
-		for _, t := range b.tracks {
+		for _, t := range b.trackL {
 			if t.NPC && b.t-t.Seen < 3 {
 				consider(objective{kind: "npc", pos: t.Pos, value: 95, trk: t})
 			}
@@ -782,7 +782,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter {
-		for _, t := range b.tracks {
+		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive) {
 				continue
 			}

@@ -57,8 +57,9 @@ func (e *Expert) Act(o *proto.Obs) proto.Action {
 		c.Mechs = append(c.Mechs, m)
 	}
 	if hunter {
-		for id, s := range e.sq.Sight {
-			if !seen[id] && o.T-s.T < 0.3 {
+		for id := 0; id < 16; id++ {
+			s := e.sq.Sight[id]
+			if s != nil && !seen[id] && o.T-s.T < 0.3 {
 				c.Mechs = append(c.Mechs, proto.ActorObs{ID: id, Kind: "mech", Pos: s.Pos, Vel: s.Vel, HP: s.HP, MaxHP: 1400, Weapons: []string{"gun"}})
 			}
 		}

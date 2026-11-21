@@ -5,6 +5,7 @@ package house
 import (
 	"math"
 	"math/rand"
+	"sort"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -365,8 +366,8 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		arrive := 2.0
 		if hunter && b.sq != nil {
 			var s *Sight
-			for _, si := range b.sq.Sight {
-				if o.T-si.T < 12 && (s == nil || si.T > s.T) {
+			for id := 0; id < 16; id++ {
+				if si := b.sq.Sight[id]; si != nil && o.T-si.T < 12 && (s == nil || si.T > s.T) {
 					s = si
 				}
 			}
@@ -388,7 +389,8 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 				}
 			}
 			if obj == nil && me.Weapons[1] == nil {
-				for id, p := range b.seenP {
+				for _, id := range sortedKeysP(b.seenP) {
+					p := b.seenP[id]
 					if p.Pos[2] > b.w.Ground(p.Pos[0], p.Pos[1])+2.5 {
 						continue
 					}
@@ -407,7 +409,8 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 				}
 			}
 			if obj == nil {
-				for id, c := range b.seenC {
+				for _, id := range sortedKeysC(b.seenC) {
+					c := b.seenC[id]
 					if c.Pos[2] > b.w.Ground(c.Pos[0], c.Pos[1])+2.5 {
 						continue
 					}
@@ -508,4 +511,22 @@ func clampf(v, lo, hi float64) float64 {
 		return hi
 	}
 	return v
+}
+
+func sortedKeysP(m map[int]proto.PickupObs) []int {
+	k := make([]int, 0, len(m))
+	for id := range m {
+		k = append(k, id)
+	}
+	sort.Ints(k)
+	return k
+}
+
+func sortedKeysC(m map[int]proto.ItemObs) []int {
+	k := make([]int, 0, len(m))
+	for id := range m {
+		k = append(k, id)
+	}
+	sort.Ints(k)
+	return k
 }

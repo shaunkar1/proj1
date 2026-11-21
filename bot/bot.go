@@ -4,6 +4,7 @@ package bot
 import (
 	"math"
 	"math/rand"
+	"sort"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -139,6 +140,10 @@ type Bot struct {
 	pickups map[int]*Item
 	crates  map[int]*Item
 	cubes   map[int]*Item
+	trackL  []*Track
+	pickupL []*Item
+	crateL  []*Item
+	cubeL   []*Item
 
 	// nav
 	path     [][2]float64
@@ -204,6 +209,14 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 		b.prevAlive = 16
 	}
 	return b
+}
+
+func sortItems(dst []*Item, m map[int]*Item) []*Item {
+	for _, it := range m {
+		dst = append(dst, it)
+	}
+	sort.Slice(dst, func(i, j int) bool { return dst[i].ID < dst[j].ID })
+	return dst
 }
 
 func (b *Bot) Name() string { return b.P.Name }
@@ -398,6 +411,14 @@ func (b *Bot) perceive(o *proto.Obs) {
 			b.hearDir = s.Bearing
 		}
 	}
+	b.trackL = b.trackL[:0]
+	for _, t := range b.tracks {
+		b.trackL = append(b.trackL, t)
+	}
+	sort.Slice(b.trackL, func(i, j int) bool { return b.trackL[i].ID < b.trackL[j].ID })
+	b.pickupL = sortItems(b.pickupL[:0], b.pickups)
+	b.crateL = sortItems(b.crateL[:0], b.crates)
+	b.cubeL = sortItems(b.cubeL[:0], b.cubes)
 	for c, until := range b.blockedC {
 		if o.T > until {
 			delete(b.blockedC, c)
