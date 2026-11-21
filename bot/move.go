@@ -108,6 +108,7 @@ func (b *Bot) navExtra() func(int) float32 {
 	z := b.zoneAt(b.t + 4)
 	r2 := (z.r - 3) * (z.r - 3)
 	nb := len(b.blockedC)
+	oc := float32(b.P.OpenCost)
 	return func(c int) float32 {
 		var e float32
 		if nb > 0 {
@@ -119,6 +120,12 @@ func (b *Bot) navExtra() func(int) float32 {
 		dx, dy := x-z.c[0], y-z.c[1]
 		if dx*dx+dy*dy > r2 {
 			e += 12
+		}
+		if oc > 0 {
+			// stay within reach of something solid: lasers cannot be dodged in the open
+			if op := nv.Open[c]; op > 24 {
+				e += oc * float32(math.Min(float64(op-24)/30, 1))
+			}
 		}
 		return e
 	}
@@ -354,6 +361,9 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			if cc := nv.Cell(x, y); cc >= 0 {
 				gz = float64(nv.Hgt[cc])
 				s -= float64(nv.Cost[cc]) * 2
+				if b.P.OpenCost > 0 && nv.Open[cc] > 24 {
+					s -= b.P.OpenCost * 4 * math.Min(float64(nv.Open[cc]-24)/30, 1)
+				}
 				if _, bad := b.blockedC[cc]; bad {
 					s -= 40
 				}

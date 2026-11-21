@@ -15,6 +15,7 @@ type Nav struct {
 	Walk   []bool
 	Hgt    []float32        // walking surface height
 	Cost   []float32        // extra cost for hugging obstacles
+	Open   []float32        // metres to the nearest tall building
 	Adj    []uint8          // bit k set: the step to neighbour k is walkable
 	Comp   []int32          // connected component id (-1 blocked)
 	Main   int32            // id of the largest component
@@ -184,6 +185,36 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			nv.Cost[c] = 0.6
 		case 3:
 			nv.Cost[c] = 0.2
+		}
+	}
+	// open ground: metres to the nearest tall building (cover against lasers)
+	nv.Open = make([]float32, n)
+	{
+		var q2 []int32
+		for c := 0; c < n; c++ {
+			x, y := nv.Pos(c)
+			if w.TopAt(x, y)-w.Ground(x, y) >= 8 {
+				nv.Open[c] = 0
+				q2 = append(q2, int32(c))
+			} else {
+				nv.Open[c] = 200
+			}
+		}
+		for len(q2) > 0 {
+			c := int(q2[0])
+			q2 = q2[1:]
+			ci, cj := c%nv.W, c/nv.W
+			for _, o := range [...][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				ni, nj := ci+o[0], cj+o[1]
+				if ni < 0 || nj < 0 || ni >= nv.W || nj >= nv.H {
+					continue
+				}
+				nc := nj*nv.W + ni
+				if nv.Open[nc] > nv.Open[c]+2 {
+					nv.Open[nc] = nv.Open[c] + 2
+					q2 = append(q2, int32(nc))
+				}
+			}
 		}
 	}
 	// components

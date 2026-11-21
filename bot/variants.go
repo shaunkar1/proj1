@@ -143,6 +143,17 @@ func Variant(name string) Params {
 	case "oldfarm":
 		p.OldArrive = true
 		p.OldReload = true
+	case "npc0":
+		p.NPCMemory = false
+		p.NPCValue = 140
+	case "npc200":
+		p.NPCValue = 200
+	case "open1":
+		p.OpenCost = 1
+	case "open2":
+		p.OpenCost = 2.5
+	case "noretcubes":
+		p.NoRetreatCubes = true
 	case "explore":
 		p.NoExplore = false
 	case "survivor":

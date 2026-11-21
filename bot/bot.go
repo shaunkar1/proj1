@@ -47,6 +47,11 @@ type Params struct {
 	PracFarmT       float64 // ... or this much time has passed
 	PracAggroD      float64 // range of the practice attack-on-sight rule
 	PracAggroHP     float64 // health needed for it
+	NoChaserRule    bool    // old behaviour: charge the laser even with a lightning carrier closing
+	NoRetreatCubes  bool    // old behaviour: ignore cubes while retreating
+	OpenCost        float64 // extra path cost for open ground far from buildings (0: off)
+	NPCValue        float64 // objective value of a drone (two cubes)
+	NPCMemory       bool    // go back to drones seen earlier
 	OldArrive       bool    // old behaviour: keep closing on the goal point inside the arrival ring
 	OldReload       bool    // old behaviour: top up the magazine whenever quiet
 	PreyRatio       float64 // free-for-all: attack on sight mechs whose danger ratio is below this (0: off)
@@ -89,7 +94,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 2.0, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 2.0, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
 		Roof: true,
 	}
 }
@@ -181,6 +186,7 @@ type Bot struct {
 	muz [3]float64
 
 	tracks  map[int]*Track
+	npcMem  map[int]*Item
 	pickups map[int]*Item
 	crates  map[int]*Item
 	cubes   map[int]*Item
@@ -245,6 +251,7 @@ type Bot struct {
 	farmPhase     bool
 	patient       bool
 	farCover      float64
+	nearOnly      bool
 	backOff       [2]float64
 	backOffT      float64
 	quietT        float64
@@ -410,6 +417,28 @@ func (b *Bot) perceive(o *proto.Obs) {
 			if d < 30 && t.LOS {
 				t.Hostile = math.Max(t.Hostile, o.T+4)
 			}
+		}
+	}
+	// drones stay near home: remember where we saw them (two cubes each)
+	if b.npcMem == nil {
+		b.npcMem = map[int]*Item{}
+	}
+	for id, t := range b.tracks {
+		if t.NPC && o.T-t.Seen < 0.25 {
+			it := b.npcMem[id]
+			if it == nil {
+				it = &Item{ID: id}
+				b.npcMem[id] = it
+			}
+			it.Pos, it.Seen = t.Pos, o.T
+		}
+	}
+	for id, it := range b.npcMem {
+		tr := b.tracks[id]
+		gone := (tr == nil || o.T-tr.Seen > 1.0) && hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) < 40 &&
+			b.w.Clear(b.eye[0], b.eye[1], b.eye[2], it.Pos[0], it.Pos[1], it.Pos[2]+2)
+		if gone || o.T-it.Seen > 120 {
+			delete(b.npcMem, id)
 		}
 	}
 	for id, t := range b.tracks {

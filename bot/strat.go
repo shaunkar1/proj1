@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -549,9 +550,26 @@ func (b *Bot) decide(act *proto.Action) {
 		mode = "retreat"
 		sp := b.findSafe(threats)
 		goal, hasGoal = sp, true
-		ctx.hide = true
+		if !underFire && incoming == 0 && !b.P.NoRetreatCubes {
+			// a cube within a few steps is health now and for good: take it on the way
+			bd := 28.0
+			for _, it := range b.cubeL {
+				if b.t < it.Bad || (it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3) {
+					continue
+				}
+				if d := hyp(px, py, it.Pos[0], it.Pos[1]); d < bd {
+					bd = d
+					goal = [2]float64{it.Pos[0], it.Pos[1]}
+					mode = "rcube"
+				}
+			}
+		}
+		ctx.hide = mode == "retreat"
+		if mode == "rcube" {
+			ctx.arrive = 1
+		}
 		ctx.boost = me.Energy > 12 && (underFire || incoming > 0)
-		if b.t < b.farCover {
+		if b.t < b.farCover && mode == "retreat" {
 			ctx.wGoal = 4
 			ctx.mustMove = true
 		}
@@ -595,15 +613,18 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	default:
 		ob := (*objective)(nil)
-		if !(hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0) {
+		hurt := hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0
+		b.nearOnly = hurt && !b.P.NoRetreatCubes
+		if !hurt || b.nearOnly {
 			ob = b.pickObjective(zEnd, hpFrac, len(mechs) > 0, budget)
 		}
+		b.nearOnly = false
 		if zoneGo && ob == nil {
 			mode = "zone"
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 2
 			ctx.boost = me.Energy > 60 && needIn > 60
-		} else if hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0 {
+		} else if hurt && ob == nil {
 			// hurt and unobserved: stay out of sight until repaired
 			mode = "heal"
 			goal, hasGoal = b.findSafe(threats), true
@@ -682,6 +703,8 @@ func (b *Bot) decide(act *proto.Action) {
 						ob.item.Bad = b.t + 60
 					}
 				}
+			case "npcgo":
+				ctx.arrive = 30
 			case "explore":
 				ctx.arrive = 20
 			case "hunt":
@@ -1199,6 +1222,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	bs := 0.0
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
+		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
+			return // repairing: only what is a few steps away and does not interrupt it
+		}
 		if bo := b.boss; bo != nil {
 			// nothing is worth walking toward the strongest mech around
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
@@ -1281,7 +1307,21 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear {
 		for _, t := range b.trackL {
 			if t.NPC && b.t-t.Seen < 3 {
-				consider(objective{kind: "npc", pos: t.Pos, value: 140, trk: t})
+				consider(objective{kind: "npc", pos: t.Pos, value: b.P.NPCValue, trk: t})
+			}
+		}
+		if b.P.NPCMemory {
+			ids := make([]int, 0, len(b.npcMem))
+			for id := range b.npcMem {
+				ids = append(ids, id)
+			}
+			sort.Ints(ids)
+			for _, id := range ids {
+				it := b.npcMem[id]
+				if tr := b.tracks[id]; tr != nil && b.t-tr.Seen < 3 {
+					continue
+				}
+				consider(objective{kind: "npcgo", pos: it.Pos, value: b.P.NPCValue - 15})
 			}
 		}
 	}
