@@ -11,6 +11,14 @@ const Profile = "f75a220+g+s+d100+t20+x6+zg400+zt1795363320"
 // ApplyProfile adjusts only the parameters used in squad matches, so the
 // free-for-all behaviour is the same under every profile.
 func ApplyProfile(p *Params, name string) {
+	if strings.HasPrefix(name, "mix:") {
+		// a different profile per match, chosen when the match starts (see mixPick)
+		p.Mix = name
+		if parts := strings.Split(name, "|"); len(parts) > 1 {
+			ApplyProfile(p, parts[1])
+		}
+		return
+	}
 	if len(name) > 6 && name[:6] == "probe:" {
 		p.Probe = name[6:]
 		name = "f75a220+g+s"
@@ -417,3 +425,32 @@ var ltnFirst = []string{"lightning_efficiency", "lightning_chain", "plating", "a
 var dmgFirst = []string{"laser_damage", "gun_damage", "gun_rate", "laser_charge", "plating", "armor", "nanites", "lightning_efficiency",
 	"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
+
+// mixPick resolves a "mix:<M>:<assign>|P0|P1|..." profile for one match: matches fall into M groups by a
+// hash of the hello's seed and slot, and assign[g] (a digit) names the profile group g plays.
+func mixPick(mix string, seed int64, slot int) string {
+	parts := strings.Split(mix, "|")
+	hd := strings.Split(parts[0], ":")
+	if len(parts) < 2 || len(hd) < 3 {
+		return ""
+	}
+	m, err := strconv.Atoi(hd[1])
+	if err != nil || m < 1 || len(hd[2]) < m {
+		return parts[1]
+	}
+	x := uint64(seed)*0x9E3779B97F4A7C15 + uint64(slot)*0xBF58476D1CE4E5B9
+	x ^= x >> 30
+	x *= 0xBF58476D1CE4E5B9
+	x ^= x >> 27
+	x *= 0x94D049BB133111EB
+	x ^= x >> 31
+	g := int(x % uint64(m))
+	k := int(hd[2][g] - '0')
+	if k < 0 || k+1 >= len(parts) {
+		k = 0
+	}
+	return parts[1+k]
+}
+
+// MixPickX is mixPick for tools.
+func MixPickX(mix string, seed int64, slot int) string { return mixPick(mix, seed, slot) }

@@ -101,6 +101,7 @@ type Params struct {
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)
 	LtnKite         bool    // against a lightning holder (and none of our own): keep it far, run when it is near, no laser charging (half speed) in its reach
+	Mix             string  // "mix:..." profile: the real profile is picked per match in New
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
@@ -384,6 +385,14 @@ type Bot struct {
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
+	if p.Mix != "" {
+		if prof := mixPick(p.Mix, int64(h.Seed), h.Slot); prof != "" {
+			name := p.Name
+			p = baseParams()
+			p.Name = name
+			ApplyProfile(&p, prof)
+		}
+	}
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
 	b.seed = int64(h.Seed)
 	b.cfgFirst, b.cfgN = cfgDiff(h.Raw)
