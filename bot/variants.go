@@ -306,6 +306,22 @@ func Variant(name string) Params {
 	case "noadv":
 		p.FFA0 = "always"
 		p.QuietAdvD = 0
+	case "xf7":
+		p.FFA0 = "always"
+		p.CrossAlive, p.CrossD = 7, 220
+	case "xf16":
+		p.FFA0 = "always"
+		p.CrossAlive, p.CrossD = 16, 220
+	case "xf7d150":
+		p.FFA0 = "always"
+		p.CrossAlive, p.CrossD = 7, 150
+	case "xf1":
+		p.FFA0 = "always"
+		p.CrossAlive, p.CrossD = 7, 220
+		p.QuietCap = 360
+	case "qc360":
+		p.FFA0 = "always"
+		p.QuietCap = 360
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
