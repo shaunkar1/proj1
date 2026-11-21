@@ -28,6 +28,7 @@ type moveCtx struct {
 	wGoal    float64
 	arrive   float64 // stop within this distance of the goal
 	mustMove bool    // standing still is not an option (zone)
+	keepOff  float64 // stay at least this far from the goal point (crates: gun depression)
 }
 
 type zoneC struct {
@@ -362,7 +363,17 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		if hasCarrot {
 			s -= ctx.wGoal * hyp(x, y, carrot[0], carrot[1])
 		} else if ctx.goal != nil {
-			s -= ctx.wGoal * 0.5 * hyp(x, y, ctx.goal[0], ctx.goal[1])
+			// arrived: stay within the arrival ring, but do not keep closing on the point itself
+			// (closing on a crate put us on top of it, where the gun cannot be brought down)
+			gd := hyp(x, y, ctx.goal[0], ctx.goal[1])
+			if b.P.OldArrive {
+				s -= ctx.wGoal * 0.5 * gd
+			} else if gd > ctx.arrive {
+				s -= ctx.wGoal * 0.5 * (gd - ctx.arrive)
+			}
+			if ctx.keepOff > 0 && gd < ctx.keepOff {
+				s -= 6 * (ctx.keepOff - gd)
+			}
 		}
 		// zone (the path's own next step is trusted when we have to move)
 		if !(c.free && ctx.mustMove) {

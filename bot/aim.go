@@ -340,7 +340,8 @@ func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 		act.Fire[ni] = true
 	}
 	// a full laser charge opens a crate in one shot: use it when nobody is about
-	if las, li := b.weapon("laser"); las != nil && b.lasFree && d < las.Stats.Range-5 && it.HP > 100 {
+	tooClose := -pi > -b.me.Stats.MinPitch*0.95 // cannot depress onto it from here: do not sit on a charge
+	if las, li := b.weapon("laser"); las != nil && b.lasFree && d < las.Stats.Range-5 && it.HP > 100 && (!tooClose || las.Charge > 0) {
 		full := las.Stats.Charge
 		if las.Charge > 0 {
 			act.Fire[li] = true
