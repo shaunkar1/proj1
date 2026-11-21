@@ -9,6 +9,16 @@ import (
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
+	if strings.HasPrefix(name, "tk") {
+		// short names for practice-profile tickets, for job files
+		m := map[string]string{"tk0": "", "tko": "+o", "tko1": "+o1", "tko2": "+o2", "tko4": "+o4", "tko5": "+o5", "tko6": "+o6", "tko7": "+o7", "tko8": "+o8", "tko9": "+o9"}
+		if suf, ok := m[name]; ok {
+			p = baseParams()
+			p.Name = name
+			ApplyProfile(&p, "f75a220+g+s+d100+x3+h35"+suf)
+			return p
+		}
+	}
 	if strings.HasPrefix(name, "prof:") {
 		p = baseParams()
 		p.Name = name

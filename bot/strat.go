@@ -1497,25 +1497,45 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				return
 			}
 		}
+		shyPen := 0.0
 		if b.quiet && !b.P.QuietHide {
+			soft := !b.ffaSure && b.P.ShySoft0 > 0
 			// do the work that does not take us toward anybody
 			for _, t := range b.trackL {
-				if !b.ffaSure && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
+				if !b.ffaSure && !soft && (d <= b.P.ShyNear0 || (b.P.ShyWeapon0 && (ob.kind == "weapon" || ob.kind == "roof"))) {
 					break
 				}
 				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
 					continue
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+				if soft {
+					if c := hyp(px, py, t.Pos[0], t.Pos[1]) - db; db < b.P.ShyFarD && c > shyPen {
+						shyPen = c
+					}
+					continue
+				}
 				if db < b.P.QuietObjD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
 					return
+				}
+			}
+			if soft {
+				for i := range b.noise {
+					n := &b.noise[i]
+					if b.t-n.t > 12 {
+						continue
+					}
+					db := hyp(ob.pos[0], ob.pos[1], n.pos[0], n.pos[1])
+					if c := hyp(px, py, n.pos[0], n.pos[1]) - db; db < b.P.ShyFarD && c > shyPen {
+						shyPen = c
+					}
 				}
 			}
 			wantLas := (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && d <= b.P.ShyLaserD
 			if b.P.ShyWeapon0 && !b.ffaSure && (ob.kind == "weapon" || ob.kind == "roof") {
 				wantLas = true
 			}
-			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas {
+			if near := b.P.ShyNear0; b.P.ShyD > 0 && d > 12 && (b.ffaSure || d > near) && !wantLas && !soft {
 				// ... nor toward anybody heard: on average we walked 66 m toward the mech that
 				// then hit us first, and it had started 200 m away
 				for i := range b.noise {
@@ -1553,7 +1573,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.practice && b.P.PracNearFarm {
 			k = 1.3 // hunters are coming to us: do not wander off for loot
 		}
-		s := ob.value - d*k
+		s := ob.value - d*k - shyPen*b.P.ShySoft0
 		if ob.kind == b.lastObjKind && hyp(ob.pos[0], ob.pos[1], b.lastObjPos[0], b.lastObjPos[1]) < 3 {
 			s += 15 // finish what we started
 		}

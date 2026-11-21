@@ -37,6 +37,14 @@ func ApplyProfile(p *Params, name string) {
 				p.QuietAlways, p.ShyWeapon0 = true, true
 			case m == "o5":
 				p.QuietAlways, p.ShyWeapon0, p.NoShyRoam0 = true, true, true
+			case m == "o6":
+				p.QuietAlways, p.NoShyRoam0, p.ShyNear0 = true, true, 1e9
+			case m == "o7":
+				p.QuietAlways, p.ShyNear0 = true, 1e9
+			case m == "o8":
+				p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 0.8
+			case m == "o9":
+				p.QuietAlways, p.NoShyRoam0, p.ShySoft0 = true, true, 1.6
 			case m == "o1":
 				p.QuietAlways, p.NoShyRoam0 = true, true
 			case m == "o2":
