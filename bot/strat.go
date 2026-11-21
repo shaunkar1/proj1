@@ -605,13 +605,42 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	// squad matches: a landed supply drop is a full repair in the middle of the brawl
 	var dropGo *proto.DropObs
-	if b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop {
+	ffaDrop := b.P.FFADrop > 0 && b.ffaSure && !b.practice && hpFrac < b.P.FFADrop && boss == nil
+	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop) || ffaDrop {
 		bd := b.P.PracDropD
 		for i := range o.Drops {
 			d := &o.Drops[i]
 			dist := hyp(px, py, d.Pos[0], d.Pos[1])
 			if dist >= bd || zEnd.outside(d.Pos[0], d.Pos[1]) > -4 {
 				continue
+			}
+			if ffaDrop {
+				// in recorded matches a third of the drops lay unclaimed for half a minute or more,
+				// and whoever took one finished in the top three: but the landing itself draws a crowd
+				if b.dropSeen == nil {
+					b.dropSeen = map[int]float64{}
+				}
+				if d.LandsIn > 0 {
+					continue
+				}
+				if _, ok := b.dropSeen[d.ID]; !ok {
+					b.dropSeen[d.ID] = b.t
+				}
+				if b.t-b.dropSeen[d.ID] < b.P.FFADropWait && hpFrac > 0.5 {
+					continue
+				}
+				if d.Holder != nil && *d.Holder != me.ID {
+					continue
+				}
+				taken := false
+				for _, t := range mechs {
+					if b.t-t.Seen < 4 && hyp(d.Pos[0], d.Pos[1], t.Pos[0], t.Pos[1]) < 40 && t != tgt {
+						taken = true
+					}
+				}
+				if taken {
+					continue
+				}
 			}
 			// set out so as to arrive as it lands, not to wait in the open
 			if dist/me.Stats.WalkSpeed+3 < d.LandsIn {
@@ -781,7 +810,7 @@ func (b *Bot) decide(act *proto.Action) {
 				switch {
 				case it.wdT == 0 || d < it.wdD-5:
 					it.wdT, it.wdD = b.t, d
-				case b.t-it.wdT > 7:
+				case b.t-it.wdT > 14:
 					it.Bad = b.t + 60
 					it.wdT = 0
 				}

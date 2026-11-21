@@ -255,6 +255,16 @@ func Variant(name string) Params {
 	case "ffa0grab70":
 		p.FFA0 = "always"
 		p.Grab = 70
+	case "noffadrop":
+		p.FFADrop = 0
+	case "ffadropall":
+		p.FFADrop = 1.01
+	case "ffadrop70":
+		p.FFADrop = 0.7
+	case "ffadropw0":
+		p.FFADropWait = 0
+	case "ffadropw20":
+		p.FFADropWait = 20
 	case "nowatchdog":
 		p.NoWatchdog = true
 	case "calm":
