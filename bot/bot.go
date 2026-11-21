@@ -47,6 +47,8 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	PracStopKills   int      // measurement: go idle in practice after this many kills
+	FixRange        float64  // fixed fighting distance in every mode (test stand-ins)
 	PracRange       float64  // fixed fighting distance in practice matches (0: choose by damage model)
 	Endgame         int      // free-for-all: with this many mechs left (but more than two), only fight back
 	PracLasLtn      bool     // in practice matches trade the gun for lightning once we hold a laser
@@ -573,6 +575,13 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		act.Jump = false
 	}
 	if b.P.NoFire {
+		act.Fire = [2]bool{}
+	}
+	if b.P.PracStopKills > 0 && b.practice && b.kills >= b.P.PracStopKills {
+		// measurement runs: stop playing after this many kills
+		act.Move = proto.Vec2{}
+		act.Jump = false
+		act.Boost = false
 		act.Fire = [2]bool{}
 	}
 	if !finite(act.Aim[0]) || !finite(act.Aim[1]) {

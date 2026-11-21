@@ -66,6 +66,9 @@ func ApplyProfile(p *Params, name string) {
 		p.PracRetreatHP = 0
 		p.PracRange = 38
 		p.PracLasLtn = true
+	case "probe1", "probe2", "probe3", "probe4", "probe5", "probe6":
+		p.PracAggro = true
+		p.PracStopKills = int(name[5] - '0')
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220
