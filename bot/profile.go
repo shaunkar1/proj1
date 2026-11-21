@@ -155,6 +155,42 @@ func ApplyProfile(p *Params, name string) {
 		p.PracFarmCubes = 10
 		p.PracFarmT = 75
 		p.PracUpgradePrio = dmgFirst
+	case "f75kite":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracRange = 170
+	case "f75kite130":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracRange = 130
+	case "f75ret50":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracRetreatHP = 0.5
+	case "f75ret20":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracRetreatHP = 0.2
+	case "f75a220":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+	case "f75peek":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracNoPeek = false
+	case "f75far":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracNearFarm = false
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220

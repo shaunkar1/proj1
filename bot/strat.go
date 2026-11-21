@@ -277,6 +277,7 @@ type objective struct {
 	value float64
 	item  *Item
 	trk   *Track
+	site  *deathSite
 }
 
 func (b *Bot) decide(act *proto.Action) {
@@ -707,6 +708,15 @@ func (b *Bot) decide(act *proto.Action) {
 				ctx.arrive = 30
 			case "explore":
 				ctx.arrive = 20
+			case "site":
+				ctx.arrive = 10
+				if st := ob.site; st != nil {
+					if st.goT == 0 {
+						st.goT = b.t
+					} else if b.t-st.goT > 45 {
+						st.bad = b.t + 120 // cannot get there: give it up
+					}
+				}
 			case "hunt":
 				ctx.arrive = 30
 			case "drop":
@@ -1289,6 +1299,15 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			continue
 		}
 		consider(objective{kind: "cube", pos: it.Pos, value: 110, item: it})
+	}
+	if b.P.Sites && !b.practice {
+		b.tidySites()
+		for _, st := range b.sites {
+			if b.t < st.bad {
+				continue
+			}
+			consider(objective{kind: "site", pos: [3]float64{st.pos[0], st.pos[1], b.w.Ground(st.pos[0], st.pos[1])}, value: st.val, site: st})
+		}
 	}
 	for _, it := range b.pickupL {
 		if b.t < it.Bad {
