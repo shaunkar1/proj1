@@ -170,6 +170,13 @@ func Variant(name string) Params {
 		p.Sites = false
 	case "nosites":
 		p.Sites = false
+	case "idlex":
+		p.NoExplore = false
+		p.NoLaserRush = true
+	case "idlexl":
+		p.NoExplore = false
+		p.NoLaserRush = true
+		p.IdleXUnarmed = true
 	case "sites":
 		p.Sites = true
 	case "sites2":
