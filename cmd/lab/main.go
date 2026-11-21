@@ -71,7 +71,7 @@ func main() {
 	hello.Config.Drops.Times = nil
 	hello.Config.Zone.StartCenter = []float64{0, 0}
 	hello.Config.Zone.Phases = []proto.ZonePhase{{HoldS: 1000, ShrinkS: 10, Radius: 500, DPS: 0}}
-	var shA, hiA, shB, hiB int
+	var shA, hiA, shB, hiB, lsA, lhA int
 	var winA, winB int
 	var hpA, hpB, tEnd float64
 	var dsum float64
@@ -125,6 +125,8 @@ func main() {
 			hpB += math.Max(B.HP, 0)
 			tEnd += s.T
 		}
+		lsA += A.LasShots
+		lhA += A.LasHits
 		shA += A.Shots
 		hiA += A.Hits
 		shB += B.Shots
@@ -134,5 +136,6 @@ func main() {
 		fmt.Printf("FIGHT %s(%s) vs %s(%s) d=%.0f: wins %d-%d of %d, mean hp left %.0f vs %.0f, mean t %.1f\n", *a, *wa, *b, *wb, *dist, winA, winB, *n, hpA/float64(*n), hpB/float64(*n), tEnd/float64(*n))
 		return
 	}
+	fmt.Printf("laser %d/%d ", lhA, lsA)
 	fmt.Printf("%s -> %s : shots %d acc %.2f | %s -> %s : shots %d acc %.2f | mean dist %.0f\n", *a, *b, shA, float64(hiA)/float64(max(shA, 1)), *b, *a, shB, float64(hiB)/float64(max(shB, 1)), dsum/float64(max(dn, 1)))
 }

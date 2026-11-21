@@ -144,6 +144,10 @@ func (b *Bot) gunHitProb(t *Track, d float64) float64 {
 
 // bestRange picks the fighting distance where our damage most outweighs theirs.
 func (b *Bot) bestRange(t *Track) (float64, float64) {
+	if b.practice && b.P.PracRange > 0 && !t.NPC {
+		d := b.P.PracRange
+		return d, b.myDps(t, d) - 1.15*b.enemyDps(t, d)
+	}
 	bestD, bestA := 130.0, math.Inf(-1)
 	for _, d := range [...]float64{28, 40, 55, 75, 100, 130, 160, 190} {
 		a := b.myDps(t, d) - 1.15*b.enemyDps(t, d)
@@ -329,6 +333,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 
 	b.farmPhase = b.P.PracFarmCubes > 0 && !b.sawOtherDeath && int(me.Cubes) < b.P.PracFarmCubes && b.t < b.P.PracFarmT
+	b.patient = b.P.Endgame > 0 && b.sawOtherDeath && o.Alive <= b.P.Endgame && o.Alive > 2
 	// ---- target choice
 	var tgt *Track
 	bestV := -1e18
@@ -861,6 +866,10 @@ func (b *Bot) decide(act *proto.Action) {
 // fair reports whether a mech is a legitimate target right now: it is hostile
 // to us, or weak enough to be worth starting a fight over.
 func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
+	if b.patient {
+		// three left: let the other two settle it unless one is on us
+		return b.t-t.HitMe < 4 || (b.t < t.Hostile && d < 70) || (t.HP < 0.3*t.MaxHP && d < 130 && hpFrac > 0.5)
+	}
 	if b.farmPhase {
 		return b.t-t.HitMe < 4 && d < 100
 	}
@@ -1064,7 +1073,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
-	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase {
+	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
 		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro)) {
 				continue

@@ -47,6 +47,8 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	PracRange       float64  // fixed fighting distance in practice matches (0: choose by damage model)
+	Endgame         int      // free-for-all: with this many mechs left (but more than two), only fight back
 	PracLasLtn      bool     // in practice matches trade the gun for lightning once we hold a laser
 	PracUpgradePrio []string // upgrade order in practice matches (empty: UpgradePrio)
 	NoPeek          bool     // ignore enemy laser timing (old behaviour)
@@ -221,6 +223,7 @@ type Bot struct {
 	coverNear     bool // last steer found a spot hidden from the target close by
 	practice      bool // looks like a squad match (see perceive)
 	farmPhase     bool
+	patient       bool
 	sawOtherDeath bool
 	hop           *geo.Exit // jet hop in progress (or being walked to)
 	hopFly        bool

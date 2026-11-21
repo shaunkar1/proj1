@@ -450,6 +450,7 @@ func (s *Sim) fireWeapons(m *Mech) {
 				tw, _ := s.W.RayHit(o[0], o[1], o[2], end[0], end[1], end[2])
 				skip := map[int]bool{}
 				lastT := tw
+				m.LasShots++
 				for n := 0; n <= int(w.Stats.Pierce); n++ {
 					tg, ok := s.entityHit(o, end, m.ID, false, skip)
 					if !ok || tg.t > tw {
@@ -467,6 +468,7 @@ func (s *Sim) fireWeapons(m *Mech) {
 							dd *= 1 + w.Stats.Cookoff
 							eff = "cookoff"
 						}
+						m.LasHits++
 						s.hurt(t, dd, "laser", m.ID, false, o, eff)
 					case 1:
 						skip[s.NPCs[tg.idx].ID] = true
