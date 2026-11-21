@@ -6,7 +6,7 @@ import (
 )
 
 // Profile selects the squad-match (practice) tuning compiled into the bot.
-const Profile = "f75a220+g+s+d100+x3+c12"
+const Profile = "f75a220+g+s+d100+x3+r25"
 
 // ApplyProfile adjusts only the parameters used in squad matches, so the
 // free-for-all behaviour is the same under every profile.
