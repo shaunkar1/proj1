@@ -1,7 +1,7 @@
 package bot
 
 // Profile selects the squad-match (practice) tuning compiled into the bot.
-const Profile = "f75hp80"
+const Profile = "f75a110"
 
 // ApplyProfile adjusts only the parameters used in squad matches, so the
 // free-for-all behaviour is the same under every profile.
