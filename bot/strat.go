@@ -489,6 +489,10 @@ func (b *Bot) decide(act *proto.Action) {
 		zoneGo = true
 	}
 	zoneUrgent := zoneGo && (zoneLate || b.zoneAt(b.t+6).outside(px, py) > -3)
+	if zoneGo && b.ffaSure && !b.practice && b.P.ZoneLead > 0 && budget < b.P.ZoneLead {
+		// 4 PM showdown: hiding on the rim, then pushed in by the zone through a mech already inside
+		zoneUrgent = true
+	}
 
 	// ---- fight or flight
 	engage := false
@@ -1894,6 +1898,18 @@ func (b *Bot) shySpot() [2]float64 {
 	zs := b.zoneAt(b.t + 25)
 	nv := b.w.Nav
 	bs := score(px, py) + 12
+	in := 0.0
+	var zE zoneC
+	if b.P.ShyInside > 0 && b.ffaSure {
+		zE = b.zoneAt(b.o.Zone.ShrinkEnd + 0.01)
+		if b.o.Zone.ShrinkEnd <= b.t {
+			zE = zoneC{b.o.Zone.NextCenter, b.o.Zone.NextRadius}
+		}
+		in = math.Min(b.P.ShyInside, zE.r*0.5)
+		if zE.outside(px, py) > -in {
+			bs = math.Inf(-1) // not a place to settle: the zone will come for us here
+		}
+	}
 	for ring := 1; ring <= 3; ring++ {
 		r := 30 * float64(ring)
 		for k := 0; k < 12; k++ {
@@ -1902,8 +1918,16 @@ func (b *Bot) shySpot() [2]float64 {
 			if !nv.WalkableMain(x, y) || zs.outside(x, y) > -12 {
 				continue
 			}
-			if s := score(x, y) - 0.12*r; s > bs {
-				bs, b.shyGoal = s, [2]float64{x, y}
+			if in > 0 && zE.outside(x, y) > -in && !math.IsInf(bs, -1) {
+				continue
+			}
+			sc := score(x, y) - 0.12*r
+			if in > 0 && zE.outside(x, y) > -in {
+				// still outside the safe part: only as a step toward it
+				sc = -1e6 - hyp(x, y, zE.c[0], zE.c[1])
+			}
+			if sc > bs {
+				bs, b.shyGoal = sc, [2]float64{x, y}
 			}
 		}
 	}

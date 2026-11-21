@@ -101,6 +101,8 @@ type Params struct {
 	QuietEngage     float64 // known free-for-all, quiet phase: engage-ratio multiplier (0: off)
 	QuietAdvD       float64 // ... and never walk in from further than this beyond our best range just because that range would favour us (0: off)
 	FFAAdvD         float64 // known free-for-all, any time: same limit on closing distance (0: off)
+	ShyInside       float64 // known free-for-all: idle spots must lie this far inside the circle the zone is shrinking to (0: off)
+	ZoneLead        float64 // known free-for-all: start walking in when this many spare seconds are left (0: only when late)
 	EndgameFFA      int     // known free-for-all: after the first death, with this many mechs or fewer left (more than two), only fight back
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)

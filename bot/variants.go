@@ -287,6 +287,25 @@ func Variant(name string) Params {
 		p.FFA0 = "always"
 		p.QuietAdvD = 25
 		p.FFAAdvD = 80
+	case "si30":
+		p.FFA0 = "always"
+		p.ShyInside = 30
+	case "si60":
+		p.FFA0 = "always"
+		p.ShyInside = 60
+	case "zl20":
+		p.FFA0 = "always"
+		p.ZoneLead = 20
+	case "zl40":
+		p.FFA0 = "always"
+		p.ZoneLead = 40
+	case "si30zl20":
+		p.FFA0 = "always"
+		p.ShyInside = 30
+		p.ZoneLead = 20
+	case "noadv":
+		p.FFA0 = "always"
+		p.QuietAdvD = 0
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
