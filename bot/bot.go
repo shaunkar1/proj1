@@ -47,6 +47,7 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	PracLasLtn      bool     // in practice matches trade the gun for lightning once we hold a laser
 	PracUpgradePrio []string // upgrade order in practice matches (empty: UpgradePrio)
 	NoPeek          bool     // ignore enemy laser timing (old behaviour)
 	Still           bool     // test: never move
