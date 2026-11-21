@@ -132,6 +132,14 @@ func Variant(name string) Params {
 		p.EarlyAlive = 8
 	case "nobiter":
 		p.NoBiter = true
+	case "sitesb15":
+		p.Sites = true
+		p.BossRatio = 1.5
+	case "sitesb13":
+		p.Sites = true
+		p.BossRatio = 1.3
+	case "boss13":
+		p.BossRatio = 1.3
 	case "sites":
 		p.Sites = true
 	case "sites2":
