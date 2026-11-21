@@ -1046,7 +1046,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter {
 		for _, t := range b.trackL {
-			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive) {
+			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro)) {
 				continue
 			}
 			consider(objective{kind: "hunt", pos: t.Pos, value: 120 - (b.t-t.Seen)*3, trk: t})
