@@ -37,6 +37,7 @@ type Params struct {
 	Roof          bool
 	NoDodge       bool
 	NoAdapt       bool
+	NoPeek        bool // ignore enemy laser timing (old behaviour)
 	Still         bool // test: never move
 	NoFire        bool // test: never shoot
 }
@@ -57,33 +58,36 @@ func DefaultParams() Params {
 }
 
 type Track struct {
-	ID       int
-	NPC      bool
-	Pos, Vel [3]float64
-	PrevVel  [3]float64
-	Aim      [2]float64
-	HP       float64
-	MaxHP    float64
-	Cubes    float64
-	Weapons  []string
-	Charging bool
-	Seen     float64 // last time present in obs
-	First    float64
-	LOS      bool    // I can shoot it right now
-	HitMe    float64 // last time it damaged me
-	DmgToMe  float64 // decayed damage it has done to me
-	IHit     float64 // last time I damaged it
-	AvgVel   [2]float64
-	Scale    float64
-	hist     [16]histRec // ring of recent states (10 Hz)
-	hn       int
-	pred     int // which predictor currently fits this target best
-	predHit  [nPred]float64
-	shots    float64 // my gun shots at it (decayed)
-	hits     float64 // my gun hits on it (decayed)
-	Hostile  float64 // considered hostile until this time
-	aimedAt  float64 // accumulated seconds spent aiming at us
-	has      [4]bool // gun mortar laser lightning
+	ID          int
+	NPC         bool
+	Pos, Vel    [3]float64
+	PrevVel     [3]float64
+	Aim         [2]float64
+	HP          float64
+	MaxHP       float64
+	Cubes       float64
+	Weapons     []string
+	Charging    bool
+	Seen        float64 // last time present in obs
+	First       float64
+	LOS         bool    // I can shoot it right now
+	HitMe       float64 // last time it damaged me
+	DmgToMe     float64 // decayed damage it has done to me
+	IHit        float64 // last time I damaged it
+	AvgVel      [2]float64
+	Scale       float64
+	hist        [16]histRec // ring of recent states (10 Hz)
+	hn          int
+	pred        int // which predictor currently fits this target best
+	predHit     [nPred]float64
+	shots       float64 // my gun shots at it (decayed)
+	hits        float64 // my gun hits on it (decayed)
+	lasChargeT  float64 // when its current laser charge began
+	lasFireT    float64 // when its laser last fired (or lost its charge)
+	wasCharging bool
+	Hostile     float64 // considered hostile until this time
+	aimedAt     float64 // accumulated seconds spent aiming at us
+	has         [4]bool // gun mortar laser lightning
 }
 
 func (t *Track) Center() [3]float64 {
@@ -188,6 +192,8 @@ type Bot struct {
 	blockedC   map[int]float64
 	objID      int
 	objT       float64
+	searchTick int       // tick of the last path search (at most one per decision)
+	coverNear  bool      // last steer found a spot hidden from the target close by
 	hop        *geo.Exit // jet hop in progress (or being walked to)
 	hopFly     bool
 	hopT       float64
@@ -262,12 +268,19 @@ func (b *Bot) perceive(o *proto.Obs) {
 		a := &o.Mechs[i]
 		t := b.tracks[a.ID]
 		if t == nil {
-			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, Scale: 1}
+			t = &Track{ID: a.ID, NPC: a.Kind == "npc", First: o.T, HitMe: -100, IHit: -100, Scale: 1, lasFireT: -100, lasChargeT: -100}
 			b.tracks[a.ID] = t
 		}
 		t.PrevVel = t.Vel
 		t.Pos, t.Vel, t.Aim = a.Pos, a.Vel, a.Aim
 		t.HP, t.MaxHP, t.Cubes, t.Weapons, t.Charging = a.HP, a.MaxHP, a.Cubes, a.Weapons, a.Charging
+		if a.Charging && !t.wasCharging {
+			t.lasChargeT = o.T
+		}
+		if !a.Charging && t.wasCharging {
+			t.lasFireT = o.T
+		}
+		t.wasCharging = a.Charging
 		t.AvgVel[0] = 0.85*t.AvgVel[0] + 0.15*a.Vel[0]
 		t.AvgVel[1] = 0.85*t.AvgVel[1] + 0.15*a.Vel[1]
 		if o.T-t.Seen > 0.25 {
@@ -410,6 +423,13 @@ func (b *Bot) perceive(o *proto.Obs) {
 			delete(b.tracks, e.Target)
 			if b.targetID == e.Target {
 				b.targetID = -1
+			}
+		}
+	}
+	for i := range o.Beams {
+		if bm := &o.Beams[i]; bm.Kind == "laser" {
+			if t := b.tracks[bm.By]; t != nil {
+				t.lasFireT = o.T - bm.Age
 			}
 		}
 	}

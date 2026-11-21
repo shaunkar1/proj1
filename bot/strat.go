@@ -13,6 +13,38 @@ func (b *Bot) cubeMul(c float64) float64 {
 	return 1 + b.cfg.Cubes.DamagePerCube*math.Min(c, b.cfg.Cubes.StatCap)
 }
 
+// laserIn: seconds until this mech's laser could next fire (large if it has none).
+func (b *Bot) laserIn(t *Track) float64 {
+	if t.NPC || !t.has[2] {
+		return 1e9
+	}
+	las := b.cfg.Weapons["laser"]
+	chg := las.Charge
+	if t.Cubes >= 3 {
+		chg *= 0.6 // may have bought faster capacitors
+	}
+	if t.Charging {
+		return math.Max(0, t.lasChargeT+chg-b.t)
+	}
+	cd := math.Max(0, t.lasFireT+las.Cooldown-b.t)
+	return cd + chg
+}
+
+// enemyDpsNL is enemyDps without the laser (which is handled by timing).
+func (b *Bot) enemyDpsNL(t *Track, d float64) float64 {
+	if !t.has[2] {
+		return b.enemyDps(t, d)
+	}
+	save := t.has[2]
+	t.has[2] = false
+	v := b.enemyDps(t, d)
+	if !(t.has[0] || t.has[1] || t.has[3]) {
+		v = 0
+	}
+	t.has[2] = save
+	return v
+}
+
 // enemyDps estimates what a mech can do to us per second at range d while it has a line on us.
 func (b *Bot) enemyDps(t *Track, d float64) float64 {
 	if t.NPC {
@@ -49,11 +81,13 @@ func (b *Bot) enemyDps(t *Track, d float64) float64 {
 }
 
 // myDps estimates our damage per second against a mech at range d with a clear line.
-func (b *Bot) myDps(t *Track, d float64) float64 {
+func (b *Bot) myDps(t *Track, d float64) float64 { return b.myDpsX(t, d, false) }
+
+func (b *Bot) myDpsX(t *Track, d float64, noLaser bool) float64 {
 	mul := b.dmgMul()
 	dps := 0.0
 	for _, w := range b.me.Weapons {
-		if w == nil {
+		if w == nil || (noLaser && w.Kind == "laser") {
 			continue
 		}
 		switch w.Kind {
@@ -296,7 +330,7 @@ func (b *Bot) decide(act *proto.Action) {
 			zoneGoal = [2]float64{x, y}
 		}
 		// real walking distance, refreshed now and then
-		if b.t-b.zonePathT > 1.5 || hyp(zoneGoal[0], zoneGoal[1], b.zonePathG[0], b.zonePathG[1]) > 25 {
+		if (b.t-b.zonePathT > 1.5 || hyp(zoneGoal[0], zoneGoal[1], b.zonePathG[0], b.zonePathG[1]) > 25) && b.searchTick != o.Tick-2 {
 			b.zonePathT = b.t
 			b.zonePathG = zoneGoal
 			b.zonePathC = b.pathCostTo(zoneGoal[0], zoneGoal[1])
@@ -339,10 +373,15 @@ func (b *Bot) decide(act *proto.Action) {
 			dEval = prefD
 		}
 		md := b.myDps(tgt, dEval)
+		inc := b.enemyDps(tgt, dEval)
+		if !b.P.NoPeek && tgt.has[2] && b.coverNear {
+			// with a corner to work from we only show ourselves while its laser is down
+			inc = b.enemyDpsNL(tgt, dEval)*0.7 + 35
+			md *= 0.7
+		}
 		if md > 0 {
 			myTTK = tgt.HP / md
 		}
-		inc := b.enemyDps(tgt, dEval)
 		// others already shooting at us
 		for _, t := range mechs {
 			if t != tgt && t.LOS && b.t < t.Hostile {
@@ -676,8 +715,9 @@ func (b *Bot) decide(act *proto.Action) {
 		act.Aim = [2]float64{y, p}
 		if las, li := b.weapon("laser"); las != nil && las.Charge > 0 {
 			act.Fire[li] = true // keep the charge
-		} else if las != nil && las.Cooldown <= 0.11 && b.t-tgt.Seen < 0.3 && mode == "fight" && hyp(px, py, tgt.Pos[0], tgt.Pos[1]) < las.Stats.Range {
-			act.Fire[li] = true
+		} else if las != nil && las.Cooldown <= 0.11 && b.t-tgt.Seen < 0.3 && mode == "fight" && hyp(px, py, tgt.Pos[0], tgt.Pos[1]) < las.Stats.Range &&
+			(b.P.NoPeek || !(tgt.has[2] && tgt.Charging)) {
+			act.Fire[li] = true // charge behind cover; step out when it is ready
 		}
 		shot = true
 	}
@@ -733,7 +773,7 @@ func (b *Bot) decide(act *proto.Action) {
 	// reload when quiet
 	if gun, _ := b.weapon("gun"); gun != nil && gun.Reload <= 0 && gun.Ammo < gun.Stats.Mag {
 		quiet := shootT == nil && (tgt == nil || !tgt.LOS)
-		if (quiet && gun.Ammo <= gun.Stats.Mag*0.6) || (quiet && b.t-b.lastDmgT > 4 && gun.Ammo < gun.Stats.Mag) {
+		if (quiet && gun.Ammo <= gun.Stats.Mag*0.5) || (quiet && tgt == nil && len(mechs) == 0 && gun.Ammo < gun.Stats.Mag) {
 			act.Reload = true
 		}
 	}

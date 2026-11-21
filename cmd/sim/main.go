@@ -79,6 +79,8 @@ func main() {
 	stream := flag.String("hello", "/home/claude/kit/mechfight-kit/check/stream.jsonl.gz", "recorded stream with a hello")
 	late := flag.Float64("late", 290, "squad all-hunt time")
 	expert := flag.String("expert", "paw", "variant used for expert house bots")
+	wa := flag.String("wa", "", "duel: slot-1 weapon for the candidate")
+	wb := flag.String("wb", "", "duel: slot-1 weapon for the opponent")
 	aggro := flag.Int("aggro", 1, "non-hunter aggression 0..2")
 	opp := flag.String("opp", "house0", "duel opponent: houseN or a variant")
 	sep := flag.Float64("sep", 130, "duel spawn separation")
@@ -182,6 +184,14 @@ func main() {
 					return t, v
 				}
 				s := sim.New(w, &hello, sd, mk)
+				if *mode == "duel" {
+					if *wa != "" {
+						s.Give(s.Mechs[mySlot], *wa)
+					}
+					if *wb != "" {
+						s.Give(s.Mechs[1-mySlot], *wb)
+					}
+				}
 				if *verbose {
 					s.Log = func(f string, a ...interface{}) { fmt.Printf("[%d] "+f+"\n", append([]interface{}{sd}, a...)...) }
 				}

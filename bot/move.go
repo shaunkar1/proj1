@@ -63,8 +63,9 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 	nv := b.w.Nav
 	me := b.me
 	if b.path == nil || hyp(gx, gy, b.pathGoal[0], b.pathGoal[1]) > 5 || b.t-b.pathT > 0.8 || !b.pathOK {
-		if b.t-b.pathT > 0.25 || hyp(gx, gy, b.pathGoal[0], b.pathGoal[1]) > 5 {
-			b.path, b.pathCost = nv.Path(me.Pos[0], me.Pos[1], gx, gy, 60000, b.navExtra())
+		if (b.t-b.pathT > 0.25 || hyp(gx, gy, b.pathGoal[0], b.pathGoal[1]) > 5) && (b.searchTick != b.o.Tick || b.path == nil) {
+			b.path, b.pathCost = nv.Path(me.Pos[0], me.Pos[1], gx, gy, 30000, b.navExtra())
+			b.searchTick = b.o.Tick
 			b.pathGoal = [2]float64{gx, gy}
 			b.pathT = b.t
 			b.pathOK = b.path != nil
@@ -125,7 +126,8 @@ func (b *Bot) navExtra() func(int) float32 {
 // pathCostTo runs a path search and returns the walking distance (metres),
 // or -1 if unreachable.
 func (b *Bot) pathCostTo(gx, gy float64) float64 {
-	p, c := b.w.Nav.Path(b.me.Pos[0], b.me.Pos[1], gx, gy, 60000, b.navExtra())
+	b.searchTick = b.o.Tick
+	p, c := b.w.Nav.Path(b.me.Pos[0], b.me.Pos[1], gx, gy, 30000, b.navExtra())
 	if p == nil {
 		return -1
 	}
@@ -287,7 +289,26 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	bestS := math.Inf(-1)
 	var bx, by float64
 	_ = 9.0
-	for _, c := range cands {
+	// laser timing: who could put a beam on us within the next moment, and is ours ready?
+	peek := !b.P.NoPeek
+	myLasReady, haveLas := false, false
+	lasVal := 0.0
+	if las, _ := b.weapon("laser"); las != nil {
+		haveLas = true
+		if las.Charge >= las.Stats.Charge-0.25 && las.Charge > 0 {
+			myLasReady = true
+			lasVal = las.Stats.Damage * b.dmgMul()
+		}
+	}
+	type scored struct {
+		s      float64
+		ok     bool
+		expTgt bool
+		x, y   float64
+	}
+	sc := make([]scored, len(cands))
+	anyExp, anyHid := false, false
+	for ci, c := range cands {
 		x, y := px+c.dx*c.r, py+c.dy*c.r
 		if c.r > 0 && !c.free {
 			if onNav {
@@ -334,13 +355,40 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				continue
 			}
 			exp := b.exposed(th.eye, x, y, cz) || b.exposed(th.eye, x, y, gz+me.Stats.Height-0.5)
+			if th.isTgt {
+				sc[ci].expTgt = exp
+			}
+			if !exp && peek && th.t.has[2] && !th.t.NPC {
+				// it is moving: will it have the line a moment from now?
+				e2 := [3]float64{th.eye[0] + th.t.Vel[0]*0.7, th.eye[1] + th.t.Vel[1]*0.7, th.eye[2]}
+				if b.exposed(e2, x, y, cz) {
+					s -= 0.5 * 315 * math.Max(th.weight, 0.6) * boolf(b.laserIn(th.t) < 1.5)
+				}
+			}
 			if exp {
-				s -= b.P.WExpo * b.enemyDps(th.t, d) * th.weight
+				if peek && th.t.has[2] {
+					// a beam is all-or-nothing: what matters is whether it can fire while we stand there
+					s -= b.P.WExpo * b.enemyDpsNL(th.t, d) * th.weight
+					if lt := b.laserIn(th.t); lt < 0.85 && d < 285 {
+						s -= 1.25 * 315 * b.cubeMul(th.t.Cubes) * math.Max(th.weight, 0.6)
+					} else if lt < 1.6 {
+						s -= 40 * th.weight
+					}
+				} else {
+					s -= b.P.WExpo * b.enemyDps(th.t, d) * th.weight
+				}
 				if ctx.hide {
 					s -= 80 * th.weight
 				}
 				if th.isTgt && ctx.wantLOS != 0 {
-					s += ctx.wantLOS * b.P.WAtk * b.myDps(th.t, d)
+					if peek && haveLas {
+						s += ctx.wantLOS * b.P.WAtk * b.myDpsX(th.t, d, true)
+						if myLasReady {
+							s += ctx.wantLOS * lasVal
+						}
+					} else {
+						s += ctx.wantLOS * b.P.WAtk * b.myDps(th.t, d)
+					}
 				}
 			}
 			// never let lightning carriers close in for free
@@ -357,7 +405,11 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		}
 		if ctx.target != nil && ctx.pref > 0 {
 			d := hyp(x, y, ctx.target.Pos[0], ctx.target.Pos[1])
-			s -= b.P.WRange * math.Abs(d-ctx.pref)
+			wr := b.P.WRange
+			if peek && ctx.target.has[2] && b.coverNear {
+				wr *= 0.15 // cover matters more than range against a laser
+			}
+			s -= wr * math.Abs(d-ctx.pref)
 		}
 		if ctx.strafe && c.r > 0 {
 			s += 5.0 * (c.dx*sdx + c.dy*sdy) * c.r / 5
@@ -378,6 +430,32 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		// inertia
 		if c.r > 0 {
 			s += 1.2 * (c.dx*b.lastMove[0] + c.dy*b.lastMove[1])
+		}
+		sc[ci] = scored{s: s, ok: true, expTgt: sc[ci].expTgt, x: x, y: y}
+		if sc[ci].expTgt {
+			anyExp = true
+		} else {
+			anyHid = true
+		}
+	}
+	b.coverNear = anyHid
+	// lurk at the corner: while hidden, stay close to a spot that has the line
+	lurk := peek && ctx.target != nil && ctx.wantLOS > 0 && anyExp && anyHid && (haveLas || ctx.target.has[2])
+	for ci, c := range cands {
+		if !sc[ci].ok {
+			continue
+		}
+		s := sc[ci].s
+		if lurk && !sc[ci].expTgt {
+			md := 14.0
+			for cj := range cands {
+				if sc[cj].ok && sc[cj].expTgt {
+					if d := hyp(sc[ci].x, sc[ci].y, sc[cj].x, sc[cj].y); d < md {
+						md = d
+					}
+				}
+			}
+			s -= 1.5 * md
 		}
 		if s > bestS {
 			bestS = s

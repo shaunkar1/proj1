@@ -519,3 +519,8 @@ func (s *Sim) stepZone() {
 }
 
 func (s *Sim) inZone(x, y float64) bool { return hyp(x, y, s.zc[0], s.zc[1]) <= s.zr }
+
+// Give puts a weapon in slot 1 (test setups).
+func (s *Sim) Give(m *Mech, kind string) {
+	m.W[1] = &Weapon{Kind: kind, Stats: s.weaponStats(m, kind)}
+}

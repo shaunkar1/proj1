@@ -495,7 +495,7 @@ func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) flo
 		if dx < dy {
 			dx, dy = dy, dx
 		}
-		return float32(dx + 0.4142*dy)
+		return float32(dx+0.4142*dy) * 1.25 // weighted: a little longer path, far fewer expansions
 	}
 	nv.g[s] = 0
 	nv.stamp[s] = gen
