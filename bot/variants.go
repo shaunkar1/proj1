@@ -93,6 +93,33 @@ func Variant(name string) Params {
 		p.ChaseD = 45
 	case "nolascheck":
 		p.NoLasCheck = true
+	case "nolaserrush":
+		p.NoLaserRush = true
+	case "llkite":
+		p.DropGunForLtn = true
+		p.FixRange = 120
+	case "llchase":
+		p.DropGunForLtn = true
+		p.FixRange = 120
+		p.ChaseHP = 0.6
+		p.ChaseD = 35
+	case "noboss":
+		p.BossRatio = 0
+	case "boss25":
+		p.BossRatio = 2.5
+	case "boss14":
+		p.BossRatio = 1.4
+	case "peri":
+		p.Periscope = 20
+	case "peri30":
+		p.Periscope = 30
+	case "spin":
+		p.SpinScan = true
+	case "spinperi":
+		p.SpinScan = true
+		p.Periscope = 20
+	case "explore":
+		p.NoExplore = false
 	case "survivor":
 		p.Endgame = 16
 		p.HuntPassive = false

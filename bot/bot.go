@@ -47,6 +47,11 @@ type Params struct {
 	PracFarmT       float64  // ... or this much time has passed
 	PracAggroD      float64  // range of the practice attack-on-sight rule
 	PracAggroHP     float64  // health needed for it
+	SpinScan        bool     // look around by turning continuously instead of sweeping
+	Periscope       float64  // opening jet hop of this many metres to look over rooftops (0: off)
+	BossRatio       float64  // free-for-all: avoid mechs this many times stronger than us (0: off)
+	NoLaserRush     bool     // old behaviour: no extra pull toward lasers and unseen ground
+	NoExplore       bool     // old behaviour: roam at random instead of toward unseen ground
 	NoLasCheck      bool     // old behaviour: release the laser without checking the muzzle line
 	ChaseHP         float64  // close in on a lone target below this health fraction (0: off)
 	ChaseD          float64  // range held while chasing
@@ -78,7 +83,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: true, BossRatio: 2.0, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6,
 		Roof: true,
 	}
 }
@@ -217,6 +222,10 @@ type Bot struct {
 	safeT         float64
 	roamGoal      [2]float64
 	roamT         float64
+	seen          []bool
+	unseenG       [2]float64
+	unseenT       float64
+	seenW, seenH  int
 	blockedC      map[int]float64
 	lastObjKind   string
 	lastObjPos    [3]float64
@@ -229,6 +238,8 @@ type Bot struct {
 	practice      bool // looks like a squad match (see perceive)
 	farmPhase     bool
 	patient       bool
+	periZ         float64
+	boss          *Track
 	sawOtherDeath bool
 	hop           *geo.Exit // jet hop in progress (or being walked to)
 	hopFly        bool
@@ -564,6 +575,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 // Act is the per-decision entry point.
 func (b *Bot) Act(o *proto.Obs) proto.Action {
 	b.perceive(o)
+	if !b.P.NoExplore {
+		b.markSeen()
+	}
 	if o.Tick <= 1 {
 		b.spawnYaw = o.Self.Aim[0]
 	}
