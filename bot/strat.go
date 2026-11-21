@@ -604,7 +604,7 @@ func (b *Bot) decide(act *proto.Action) {
 		} else if b.t-b.grabT > 7 {
 			grab.Bad = b.t + 60
 		}
-	case ghost != nil && b.t-ghost.HitMe < 2.5 && (tgt == nil || !tgt.LOS || (b.P.EvadeSniper && ghost.has[2] && !finishing && !b.practice)):
+	case ghost != nil && b.t-ghost.HitMe < 2.5 && (tgt == nil || !tgt.LOS || (b.P.EvadeSniper && b.ffaSure && ghost.has[2] && !finishing && !b.practice)):
 		// being hit by someone unseen: never stand there, get something solid in between
 		mode = "evade"
 		sp := b.findSafe(threats)
