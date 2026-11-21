@@ -50,6 +50,22 @@ func ApplyProfile(p *Params, name string) {
 		p.PracBerserk = true
 		p.PracRetreatHP = 0
 		p.PracLasLtn = true
+	case "rush45":
+		p.PracAggro = true
+		p.PracBerserk = true
+		p.PracRetreatHP = 0
+		p.PracRange = 45
+	case "rush70":
+		p.PracAggro = true
+		p.PracBerserk = true
+		p.PracRetreatHP = 0
+		p.PracRange = 70
+	case "rushltn":
+		p.PracAggro = true
+		p.PracBerserk = true
+		p.PracRetreatHP = 0
+		p.PracRange = 38
+		p.PracLasLtn = true
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220

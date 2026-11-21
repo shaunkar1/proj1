@@ -67,6 +67,8 @@ type Mech struct {
 	ZoneDmg  float64
 	DmgLog   []DmgRec
 	Shots    int
+	LasShots int
+	LasHits  int
 	Hits     int
 	FirstW   float64 // time the first extra weapon was taken (-1: never)
 	FirstLas float64

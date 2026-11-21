@@ -62,6 +62,20 @@ func Variant(name string) Params {
 		p.EngageRatio = 1e9
 		p.RetreatHP = 0
 		p.NoDodge = true
+	case "patient":
+		p.Endgame = 3
+	case "nomortar":
+		p.WeaponRank = map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}
+	case "lasltnnm":
+		p.DropGunForLtn = true
+		p.WeaponRank = map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}
+	case "survivor":
+		p.Endgame = 16
+		p.HuntPassive = false
+	case "patient6":
+		p.Endgame = 6
+	case "patient4":
+		p.Endgame = 4
 	case "nododge":
 		p.NoDodge = true
 	case "lasltn":
