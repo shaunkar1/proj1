@@ -255,6 +255,8 @@ func Variant(name string) Params {
 	case "ffa0grab70":
 		p.FFA0 = "always"
 		p.Grab = 70
+	case "noevsn":
+		p.EvadeSniper = false
 	case "noopen":
 		p.Open = false
 	case "openlas":
