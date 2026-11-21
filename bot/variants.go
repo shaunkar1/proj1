@@ -168,6 +168,10 @@ func Variant(name string) Params {
 		// previous defaults
 		p.BossRatio = 2.0
 		p.Sites = false
+		p.NoExplore = true
+		p.RoofBold = false
+	case "b10":
+		p.NoExplore = true
 	case "nosites":
 		p.Sites = false
 	case "idlex":
@@ -239,6 +243,8 @@ func Variant(name string) Params {
 		p.NoRetreatCubes = true
 	case "explore":
 		p.NoExplore = false
+	case "noexplore":
+		p.NoExplore = true
 	case "survivor":
 		p.Endgame = 16
 		p.HuntPassive = false
