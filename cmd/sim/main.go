@@ -96,6 +96,9 @@ func main() {
 	expert := flag.String("expert", "paw", "variant used for expert house bots")
 	wa := flag.String("wa", "", "duel: slot-1 weapon for the candidate")
 	wb := flag.String("wb", "", "duel: slot-1 weapon for the opponent")
+	ramp := flag.Float64("ramp", 1, "extra hunters per dead squad member")
+	easyNoise := flag.Float64("easynoise", 0.10, "aim noise of easy house bots (rad)")
+	medNoise := flag.Float64("mednoise", 0.05, "aim noise of medium house bots (rad)")
 	aggro := flag.Int("aggro", 1, "non-hunter aggression 0..2")
 	opp := flag.String("opp", "house0", "duel opponent: houseN or a variant")
 	sep := flag.Float64("sep", 130, "duel spawn separation")
@@ -104,6 +107,8 @@ func main() {
 	trace := flag.String("trace", "", "write a trace of the first match to this file")
 	flag.Parse()
 
+	house.Levels[0].AimNoise = *easyNoise
+	house.Levels[1].AimNoise = *medNoise
 	base := loadHello(*stream)
 	w0, err := geo.Load("mapdata/arena")
 	if err != nil {
@@ -130,6 +135,7 @@ func main() {
 				sq := house.NewSquad()
 				sq.LateT = *late
 				sq.Aggro = *aggro
+				sq.Ramp = *ramp
 				mySlot := int(sd*7) % 16
 				hello := *base
 				if *mode == "duel" {

@@ -23,14 +23,15 @@ type Squad struct {
 	Alive    map[int]float64 // last report time
 	Sight    map[int]*Sight
 	LateT    float64
-	Aggro    int // 0: non-hunters never fight; 1: only when hit or crowded; 2: whenever they see the enemy
+	Ramp     float64 // extra hunters per dead member
+	Aggro    int     // 0: non-hunters never fight; 1: only when hit or crowded; 2: whenever they see the enemy
 	T        float64
 	hunters  map[int]bool
 	huntCalc float64
 }
 
 func NewSquad() *Squad {
-	return &Squad{Members: map[int]int{}, Alive: map[int]float64{}, Sight: map[int]*Sight{}, LateT: 290, Aggro: 1, hunters: map[int]bool{}, huntCalc: -1}
+	return &Squad{Members: map[int]int{}, Alive: map[int]float64{}, Sight: map[int]*Sight{}, LateT: 290, Aggro: 1, Ramp: 1, hunters: map[int]bool{}, huntCalc: -1}
 }
 
 func (s *Squad) Report(o *proto.Obs) {
@@ -61,7 +62,7 @@ func (s *Squad) IsHunter(id int, aliveTotal int) bool {
 				dead++
 			}
 		}
-		n := 1 + dead
+		n := 1 + int(float64(dead)*s.Ramp)
 		s.hunters = map[int]bool{}
 		for lvl := 0; lvl <= 3 && n > 0; lvl++ {
 			for mid := 0; mid < 64 && n > 0; mid++ {
