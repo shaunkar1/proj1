@@ -142,7 +142,15 @@ func main() {
 		case "obs":
 			var o proto.Obs
 			if err := json.Unmarshal(newest, &o); err != nil {
+				// never lose the tick over one odd field: answer with the last action
 				logf("bad obs: %v", err)
+				var tk struct {
+					Tick int `json:"tick"`
+				}
+				if json.Unmarshal(newest, &tk) == nil {
+					fb := proto.Action{Tick: tk.Tick, Move: last.Move, Aim: last.Aim, Boost: last.Boost}
+					send(encode(&fb))
+				}
 				continue
 			}
 			if busy {
