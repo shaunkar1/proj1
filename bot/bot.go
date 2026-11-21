@@ -98,6 +98,9 @@ type Params struct {
 	BossFarD        float64 // free-for-all: an errand this far from the strongest mech is fine even if it is nearer to it than we are
 	NoBreak         bool    // no walking away from a spot we keep circling
 	QuietCap        float64 // ... but never past this time
+	QuietEngage     float64 // known free-for-all, quiet phase: engage-ratio multiplier (0: off)
+	QuietAdvD       float64 // ... and never walk in from further than this beyond our best range just because that range would favour us (0: off)
+	FFAAdvD         float64 // known free-for-all, any time: same limit on closing distance (0: off)
 	EndgameFFA      int     // known free-for-all: after the first death, with this many mechs or fewer left (more than two), only fight back
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)

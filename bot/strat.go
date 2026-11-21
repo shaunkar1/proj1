@@ -524,7 +524,22 @@ func (b *Bot) decide(act *proto.Action) {
 			// crowded early game: an even duel mostly feeds whoever shows up third
 			er *= b.P.EarlyEngage
 		}
-		engage = myTTK < er*theirTTK || (adv > 25 && er >= b.P.EngageRatio)
+		advOK := adv > 25 && er >= b.P.EngageRatio
+		if b.ffaSure && !b.practice {
+			// 4 PM showdown: with lightning and full health we walked 110 m across open ground at a
+			// charging laser because close range "would favour us", and lost 1,900 HP on the way
+			if b.quiet && b.P.QuietEngage > 0 {
+				er *= b.P.QuietEngage
+			}
+			lim := b.P.FFAAdvD
+			if b.quiet && b.P.QuietAdvD > 0 && (lim <= 0 || b.P.QuietAdvD < lim) {
+				lim = b.P.QuietAdvD
+			}
+			if lim > 0 && d-prefD > lim {
+				advOK = false
+			}
+		}
+		engage = myTTK < er*theirTTK || advOK
 		if nHostile >= 2 && myTTK > 2.5 {
 			engage = engage && myTTK*1.5 < theirTTK
 		}
