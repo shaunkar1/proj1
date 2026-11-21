@@ -355,6 +355,17 @@ func (b *Bot) decide(act *proto.Action) {
 	if !b.ffaSure && !b.P.NoLegacy {
 		b.E = effP{0.85, 1.5, 160, 150, 1e9, 0, true, false, false, false}
 	}
+	if b.P.QuietT > 0 && b.t < b.P.QuietT && (b.ffaSure || b.P.QuietAlways) && !b.practice {
+		// recorded matches: mechs that stayed out of every exchange for the first 75 s finished
+		// 5th on average, those drawn in within 15 s finished 9th-10th - and they started just as
+		// close to their neighbours. Early on, keep away from everyone and out of their sight.
+		if b.P.QuietHide {
+			b.E.BossRatio, b.E.HardRatio, b.E.BossObjD, b.E.BossAvoidD, b.E.BossSeenD = 0.85, 0, b.P.QuietObjD, b.P.QuietAvoidD, 1e9
+		}
+		b.quiet = true
+	} else {
+		b.quiet = false
+	}
 	b.boss = nil
 	b.peer = nil
 	bossD := 1e9
@@ -1463,6 +1474,18 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
 			if db < b.E.BossObjD || db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 {
 				return
+			}
+		}
+		if b.quiet && !b.P.QuietHide {
+			// do the work that does not take us toward anybody
+			for _, t := range b.trackL {
+				if t.NPC || t.Ghost || b.t-t.Seen > 8 {
+					continue
+				}
+				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+				if db < b.P.QuietObjD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
+					return
+				}
 			}
 		}
 		if pe := b.peer; pe != nil && b.t-pe.Seen < 8 {
