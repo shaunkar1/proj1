@@ -6,7 +6,7 @@ import (
 )
 
 // Profile selects the squad-match (practice) tuning compiled into the bot.
-const Profile = "mix:16:1212121212121212|f75a220+g+s+d100+x3+h35+zg400+zt1795363320|f75a220+g+s+d100+x6+zg400+zt1795363320|f75a220+g+s+d100+x1+zg400+zt1795363320|f75a220+g+s+d100+x3+zg400+zt1795363320|f75a220+g+s+d100+x5+zg400+zt1795363320|f75a220+g+s+d100+h35+x6+zg400+zt1795363320|f75a220+g+s+x1+zg400+zt1795363320"
+const Profile = "mix:16:1000100010001000|f75a220+g+s+d100+x3+h35+zg400+zt1795363320|f75a220+g+s+d100+x6+zg400+zt1795363320|f75a220+g+s+d100+x1+zg400+zt1795363320|f75a220+g+s+d100+x3+zg400+zt1795363320|f75a220+g+s+d100+x5+zg400+zt1795363320|f75a220+g+s+d100+h35+x6+zg400+zt1795363320|f75a220+g+s+x1+zg400+zt1795363320"
 
 // ApplyProfile adjusts only the parameters used in squad matches, so the
 // free-for-all behaviour is the same under every profile.
