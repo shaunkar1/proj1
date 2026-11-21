@@ -545,6 +545,41 @@ func (b *Bot) decide(act *proto.Action) {
 	var farmNPC *Track
 
 	underFire := b.t-b.lastDmgT < 2.5
+	// a weapon lying a few steps away comes before the fight it would win
+	var grab *Item
+	if b.P.Grab > 0 && (b.ffaSure || b.P.GrabAlways) && hpFrac > 0.3 {
+		gd := b.P.Grab
+		for _, it := range b.pickupL {
+			if b.t < it.Bad || math.Abs(it.Pos[2]-me.Pos[2]) > 3 {
+				continue
+			}
+			lim := b.P.Grab
+			if it.Kind != "laser" || b.holds("laser") {
+				if b.slot1Rank() != 0 || b.wantPickup(it) <= 0 {
+					continue
+				}
+				lim = b.P.Grab * 0.55
+			}
+			d := hyp(px, py, it.Pos[0], it.Pos[1])
+			if d > lim || d >= gd {
+				continue
+			}
+			// not into the arms of whoever is shooting
+			near := false
+			for _, t := range mechs {
+				if hyp(it.Pos[0], it.Pos[1], t.Pos[0], t.Pos[1]) < 30 && b.t-t.Seen < 2 {
+					near = true
+				}
+			}
+			if near {
+				continue
+			}
+			if rd := b.roughDist(it.Pos[0], it.Pos[1]); rd > lim*1.4 {
+				continue
+			}
+			gd, grab = d, it
+		}
+	}
 	switch {
 	case zoneUrgent:
 		mode = "zone"
@@ -555,6 +590,19 @@ func (b *Bot) decide(act *proto.Action) {
 		if tgt != nil {
 			ctx.target = tgt
 			ctx.strafe = false
+		}
+	case grab != nil:
+		mode = "grab"
+		goal, hasGoal = [2]float64{grab.Pos[0], grab.Pos[1]}, true
+		ctx.arrive = 1.0
+		ctx.boost = me.Energy > 8
+		ctx.wGoal = 4
+		ctx.mustMove = true
+		ctx.target = tgt
+		if b.grabID != grab.ID {
+			b.grabID, b.grabT = grab.ID, b.t
+		} else if b.t-b.grabT > 7 {
+			grab.Bad = b.t + 60
 		}
 	case ghost != nil && b.t-ghost.HitMe < 2.5 && (tgt == nil || !tgt.LOS || (b.P.EvadeSniper && ghost.has[2] && !finishing && !b.practice)):
 		// being hit by someone unseen: never stand there, get something solid in between
@@ -1067,10 +1115,11 @@ func (b *Bot) decide(act *proto.Action) {
 				}
 			}
 		}
-		if !shot && farm != nil {
+		look := b.P.ScanFirst && b.t < 1.7 && (b.ffaSure || b.P.GrabAlways)
+		if !shot && farm != nil && !look {
 			shot = b.shootCrate(act, farm)
 		}
-		if !shot && !b.retreating {
+		if !shot && !b.retreating && !look {
 			// opportunistic: any crate in easy reach
 			var bc *Item
 			bd := 110.0

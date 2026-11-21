@@ -68,6 +68,10 @@ type Params struct {
 	ChaseD          float64  // range held while chasing
 	PracStopKills   int      // measurement: go idle in practice after this many kills
 	Probe           string   // measurement runs (see probeStop)
+	FFA0            string   // start-of-match free-for-all test (see ffaAtStart)
+	Grab            float64  // weapon within this many metres is fetched before anything else (0 = off)
+	GrabAlways      bool     // also before the match is known to be a free-for-all
+	ScanFirst       bool     // finish the first look around before shooting crates
 	PracLtnRank     float64  // squad matches: value of lightning as a second weapon (0: the usual rank; laser is 3)
 	Ambush          float64  // open on mechs looking away from us inside this range when we hold a laser (0: off)
 	AmbushAng       float64  // how far off us its aim must be (rad)
@@ -119,7 +123,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, ScanFirst: true, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -290,6 +294,8 @@ type Bot struct {
 	seed          int64
 	peer          *Track
 	sawOtherDeath bool
+	grabID        int
+	grabT         float64
 	hop           *geo.Exit // jet hop in progress (or being walked to)
 	hopFly        bool
 	hopT          float64
@@ -308,6 +314,9 @@ type Bot struct {
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
 	b.seed = int64(h.Seed)
+	if b.ffaAtStart() {
+		b.ffaSure, b.sawOtherDeath = true, true
+	}
 	b.rng = rand.New(rand.NewSource(int64(h.Seed) + 7919*int64(h.Slot)))
 	b.tracks = map[int]*Track{}
 	b.pickups = map[int]*Item{}
@@ -700,6 +709,19 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 
 // DbgMode returns the last decision's mode label (for tooling).
 func (b *Bot) DbgMode() string { return b.dbg }
+
+// ffaAtStart: rules that tell a free-for-all from a squad match before the first tick.
+func (b *Bot) ffaAtStart() bool {
+	switch b.P.FFA0 {
+	case "always":
+		return true
+	case "slot":
+		return b.slot != 0
+	case "seed":
+		return b.seed >= 1000000
+	}
+	return false
+}
 
 // probeStop: measurement builds go idle under a condition, so the score reveals
 // something about the matches the scorer runs.

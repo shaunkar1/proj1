@@ -243,6 +243,21 @@ func Variant(name string) Params {
 		p.PileBonus = 50
 	case "nolegacy":
 		p.NoLegacy = true
+	case "ffa0":
+		p.FFA0 = "always"
+	case "ffa0nograb":
+		p.FFA0 = "always"
+		p.Grab = 0
+		p.ScanFirst = false
+	case "ffa0noscan":
+		p.FFA0 = "always"
+		p.ScanFirst = false
+	case "ffa0grab70":
+		p.FFA0 = "always"
+		p.Grab = 70
+	case "nograb":
+		p.Grab = 0
+		p.ScanFirst = false
 	case "sites":
 		p.Sites = true
 	case "sites2":
