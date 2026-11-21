@@ -541,7 +541,7 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.target = tgt
 			ctx.strafe = false
 		}
-	case ghost != nil && (tgt == nil || !tgt.LOS) && b.t-ghost.HitMe < 2.5:
+	case ghost != nil && b.t-ghost.HitMe < 2.5 && (tgt == nil || !tgt.LOS || (b.P.EvadeSniper && ghost.has[2] && !finishing && !b.practice)):
 		// being hit by someone unseen: never stand there, get something solid in between
 		mode = "evade"
 		sp := b.findSafe(threats)

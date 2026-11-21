@@ -73,6 +73,7 @@ type Params struct {
 	Snipe           float64  // open on laserless mechs between 110 m and this range when we hold a laser (0: off)
 	Preempt         float64  // open on any near-equal mech inside this range when we hold a laser (0: off)
 	NoBiter         bool     // test: old behaviour, a drone hitting us does not come before pre-aiming at an unseen mech
+	EvadeSniper     bool     // a laser from someone we cannot see breaks off the fight we are in (unless it is nearly won)
 	HardRatio       float64  // above this ratio a mech is avoided outright; between BossRatio and this it is only given room (0: everything above BossRatio is avoided outright)
 	PeerAvoidD      float64  // step out of an equal\'s line of sight inside this distance
 	PeerObjD        float64  // leave alone objectives this close to an equal

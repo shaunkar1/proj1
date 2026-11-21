@@ -222,6 +222,63 @@ func ApplyProfile(p *Params, name string) {
 		p.PracFarmCubes = 10
 		p.PracFarmT = 75
 		p.PracAggroHP = 0.8
+	case "f60a220":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 60
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+	case "f90a220":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 90
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+	case "f75a220r20":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracRetreatHP = 0.2
+	case "f75a220h30":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.3
+	case "f75a220h60":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.6
+	case "f75a260":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 260
+		p.PracAggroHP = 0.45
+	case "f75a190":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 190
+		p.PracAggroHP = 0.45
+	case "f75a220far":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracNearFarm = false
+	case "f75a220dmg":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
+		p.PracAggroD = 220
+		p.PracAggroHP = 0.45
+		p.PracUpgradePrio = dmgFirst
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220

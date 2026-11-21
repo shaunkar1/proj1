@@ -219,6 +219,11 @@ func Variant(name string) Params {
 	case "nopeer":
 		p.BossRatio = 1.5
 		p.HardRatio = 0
+	case "evsn":
+		p.EvadeSniper = true
+	case "evsner12":
+		p.EvadeSniper = true
+		p.EngageRatio = 1.2
 	case "sites":
 		p.Sites = true
 	case "sites2":
