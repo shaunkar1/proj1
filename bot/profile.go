@@ -112,6 +112,25 @@ func ApplyProfile(p *Params, name string) {
 		p.PracFarmCubes = 4
 		p.PracFarmT = 50
 		p.PracRange = 150
+	case "farm15":
+		p.PracAggro = true
+		p.PracFarmCubes = 15
+		p.PracFarmT = 170
+	case "farm21":
+		p.PracAggro = true
+		p.PracFarmCubes = 21
+		p.PracFarmT = 220
+	case "farm6base":
+		p.PracFarmCubes = 6
+		p.PracFarmT = 75
+	case "farm6t110":
+		p.PracAggro = true
+		p.PracFarmCubes = 6
+		p.PracFarmT = 110
+	case "farm10t75":
+		p.PracAggro = true
+		p.PracFarmCubes = 10
+		p.PracFarmT = 75
 	case "aggro220":
 		p.PracAggro = true
 		p.PracAggroD = 220
