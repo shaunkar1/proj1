@@ -1885,6 +1885,15 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 	case b.t < 1.7 || (b.P.Periscope > 0 && b.t < 3.3 && !me.Grounded):
 		// first look: one full turn to find weapons and crates nearby
 		act.Aim = [2]float64{angDiff(b.spawnYaw+me.Stats.TurnRate*(b.t+0.3), 0), 0}
+		if b.cfgN == 0 && b.wallMed != 0 {
+			// how fast the server ticks (torso pitch is free during the first look, and back level before it ends)
+			switch {
+			case b.t >= 0.85 && b.t < 1.15:
+				act.Aim[1] = wallCode(b.wallMed)
+			case b.t >= 1.15 && b.t < 1.42:
+				act.Aim[1] = wallCode(b.wallMin)
+			}
+		}
 		if b.cfgN > 0 {
 			// the rules of this match are not the published ones: show it (torso pitch is free during the first look)
 			switch {

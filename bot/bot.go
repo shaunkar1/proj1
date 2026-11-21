@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"time"
 
 	"mechbot/geo"
 	"mechbot/proto"
@@ -93,6 +94,7 @@ type Params struct {
 	ShyT0           float64 // > 0: quiet time before the free-for-all is known ends this early
 	ShyMove0        bool    // ... and with nothing to do we walk on, away from everybody, over unseen ground, instead of standing
 	NoShyRoam0      bool    // ... and there is no idling at a quiet spot yet
+	QuietNoAim      bool    // quiet time (free-for-all known): being looked at is no reason to open fire, only a charging laser or a hit is
 	ShyRoam         bool    // quiet time with nothing to do: drift to where nobody was seen or heard
 	QuietAvoidD     float64
 	PracDrop        float64 // squad matches: below this health fraction walk to a supply drop and stand in it (0 = off)
@@ -302,6 +304,11 @@ type Bot struct {
 	shyT          float64
 	cfgFirst      int // hello differs from the kit's: first section, and how many (see cfgDiff)
 	cfgN          int
+	wallOn        bool // running under the real server: observation arrival times are kept
+	wallAt        []time.Time
+	wallTick      []int
+	wallMed       float64 // ms between observations early in the match (median, minimum); 0 = not measured
+	wallMin       float64
 	shyMoveT      float64
 	shyMoveG      [2]float64
 	safeSpot      [2]float64
@@ -362,6 +369,7 @@ func New(h *proto.Hello, w *geo.World, p Params) *Bot {
 	b := &Bot{P: p, w: w, cfg: h.Config, slot: h.Slot}
 	b.seed = int64(h.Seed)
 	b.cfgFirst, b.cfgN = cfgDiff(h.Raw)
+	b.wallOn = len(h.Raw) > 0
 	if b.ffaAtStart() {
 		b.ffaSure, b.sawOtherDeath = true, true
 	}
@@ -505,7 +513,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			if a.Charging && off > 0.6 {
 				t.busyT = o.T // lining up on somebody else
 			}
-			if t.aimedAt >= 0.6 {
+			if t.aimedAt >= 0.6 && !(b.P.QuietNoAim && b.quiet && b.ffaSure && !a.Charging && d > 60) {
 				t.Hostile = math.Max(t.Hostile, o.T+8)
 			}
 			if d < 30 && t.LOS {
@@ -719,6 +727,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 
 // Act is the per-decision entry point.
 func (b *Bot) Act(o *proto.Obs) proto.Action {
+	if b.wallOn && b.wallMed == 0 {
+		b.wallClock(o)
+	}
 	b.perceive(o)
 	if !b.P.NoExplore {
 		b.markSeen()
@@ -777,6 +788,8 @@ func (b *Bot) ffaAtStart() bool {
 		return b.slot != 0
 	case "seed":
 		return b.seed >= 1000000
+	case "cfg":
+		return b.cfgN > 0
 	}
 	return false
 }
@@ -868,4 +881,37 @@ func (b *Bot) heardMech(kind string, brg float64, band string, at float64) {
 		keep = append(keep, n)
 	}
 	b.noise = append(keep, noiseSrc{pos: [2]float64{x, y}, t: at, far: far})
+}
+
+// wallClock measures how long the server takes between observations in the first second.
+func (b *Bot) wallClock(o *proto.Obs) {
+	if o.T < 0.05 {
+		return
+	}
+	if o.T <= 0.82 {
+		b.wallAt = append(b.wallAt, time.Now())
+		b.wallTick = append(b.wallTick, o.Tick)
+		return
+	}
+	var d []float64
+	for i := 1; i < len(b.wallAt); i++ {
+		if b.wallTick[i]-b.wallTick[i-1] == 2 {
+			d = append(d, float64(b.wallAt[i].Sub(b.wallAt[i-1]).Microseconds())/1000)
+		}
+	}
+	if len(d) < 3 {
+		b.wallMed, b.wallMin = -1, -1
+		return
+	}
+	sort.Float64s(d)
+	b.wallMed, b.wallMin = math.Max(d[len(d)/2], 0.01), math.Max(d[0], 0.01)
+}
+
+// wallCode turns milliseconds into a torso pitch: 0.03 rad per half octave, 0.15 rad = 1 ms.
+func wallCode(ms float64) float64 {
+	if ms <= 0 {
+		return 0.6
+	}
+	k := math.Round(2 * math.Log2(ms))
+	return 0.03 * (math.Max(-4, math.Min(14, k)) + 5)
 }
