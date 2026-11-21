@@ -1460,8 +1460,24 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	px, py := me.Pos[0], me.Pos[1]
 	var best *objective
 	bs := 0.0
+	// mechs worth a detour: in recorded matches most of our deaths were even duels that began
+	// when an errand took us within 60 m of somebody as strong as we were
+	var keep []*Track
+	if b.P.KeepAwayD > 0 && b.ffaSure && !b.practice && !b.quiet && b.o.Alive > b.P.KeepAwayAlive {
+		for _, t := range b.trackL {
+			if !t.NPC && !t.Ghost && b.t-t.Seen < 8 && b.dangerRatio(t) >= b.P.KeepAwayRatio {
+				keep = append(keep, t)
+			}
+		}
+	}
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
+		for _, t := range keep {
+			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
+				return
+			}
+		}
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
 			// repairing: only what is a few steps away and does not interrupt it -
 			// except a weapon while we have none worth the name

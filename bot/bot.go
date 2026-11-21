@@ -77,6 +77,9 @@ type Params struct {
 	OpenHP          float64
 	OpenBusyD       float64
 	NoOpenLas       bool
+	KeepAwayD       float64  // free-for-all: skip errands this close to a mech at least KeepAwayRatio as strong as us (0 = off)
+	KeepAwayRatio   float64
+	KeepAwayAlive   int      // ... while more than this many are alive
 	QuietT          float64 // free-for-all: for this long treat every mech as one to keep away from (0 = off)
 	QuietAlways     bool    // ... also before the match is known to be a free-for-all
 	QuietHide       bool    // quiet time also sends us to cover from anyone in view (else it only filters what we walk to)
@@ -144,7 +147,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, QuietT: 45, QuietObjD: 120, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 45, QuietObjD: 120, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
