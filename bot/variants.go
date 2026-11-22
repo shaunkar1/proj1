@@ -650,6 +650,30 @@ func Variant(name string) Params {
 		p.FFA0 = "always"
 		p.HushT = 0
 		p.FleeD = 130
+	case "el8b":
+		p.FFA0 = "always"
+		p.EndLow = 8
+	case "el12":
+		p.FFA0 = "always"
+		p.EndLow = 12
+	case "el10s3":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.LateStrike = 3
+		p.LateStrikeRatio = 0.85
+	case "el10d20":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowD = 20
+	case "el10d70":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowD = 70
+	case "el10a":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowD = 0
+		p.EndLowFarm = true
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
