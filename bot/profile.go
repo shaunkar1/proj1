@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const Profile = "f75a190+g+s+d100+x3+r34+a180+zg400+zt1795363320"
+const Profile = "f75a190+g+s+d100+x3+r29+h40+zg400+zt1795363320"
 
 func ApplyProfile(p *Params, name string) {
 	if strings.HasPrefix(name, "mix:") || strings.HasPrefix(name, "mixs:") || strings.HasPrefix(name, "mixl:") {
