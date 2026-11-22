@@ -364,6 +364,9 @@ func (b *Bot) decide(act *proto.Action) {
 	} else {
 		b.quiet = false
 	}
+	if b.P.HideCover > 0 && b.hideOn() {
+		b.hideSurvey()
+	}
 	b.endLow = b.P.EndLow > 0 && b.ffaSure && !b.practice && b.othersDied > 0 && o.Alive <= b.P.EndLow && o.Alive > 2
 	if b.endLow && b.P.EndLowZoneR > 0 && o.Zone.Radius < b.P.EndLowZoneR {
 		b.endLow = false
@@ -1186,6 +1189,9 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	b.DbgGoal, b.DbgHasGoal = goal, hasGoal
+	if hideDebug {
+		b.hideTrace()
+	}
 	if hasGoal {
 		ctx.goal = &goal
 	}
@@ -1364,6 +1370,10 @@ func (b *Bot) decide(act *proto.Action) {
 		boost = true
 	} else {
 		mx, my, boost = b.steer(ctx)
+	}
+	if b.P.HideStill && b.hideOn() && mode == "shy" && hasGoal && !climbing && !bolt && me.Grounded && b.t >= b.unstickT &&
+		hyp(px, py, goal[0], goal[1]) <= 3 && len(b.o.Projectiles) == 0 && b.t-b.lastDmgT > 3 {
+		mx, my, boost = 0, 0, false
 	}
 	if !me.Grounded && b.t >= b.unstickT && !climbing && !bolt {
 
@@ -2210,6 +2220,9 @@ func (b *Bot) zoneGoalInside(zEnd zoneC, snapped [2]float64, marginR, in float64
 func (b *Bot) shySpot() [2]float64 {
 	me := b.me
 	px, py := me.Pos[0], me.Pos[1]
+	if b.hideOn() {
+		return b.hideSpot()
+	}
 	if b.t < b.shyT {
 		return b.shyGoal
 	}

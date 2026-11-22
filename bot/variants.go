@@ -618,6 +618,44 @@ func Variant(name string) Params {
 	case "sh25":
 		p.FFA0 = "always"
 		p.ShyHold = 25
+	case "hs40":
+
+		p.FFA0 = "always"
+		p.HideStick = 40
+	case "hst":
+
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+	case "hc60", "hc120", "hc240":
+
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+		p.HideCover = map[string]float64{"hc60": 60, "hc120": 120, "hc240": 240}[name]
+	case "hg40", "hg80":
+
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+		p.HideGeo = map[string]float64{"hg40": 40, "hg80": 80}[name]
+	case "hk30":
+
+		p.FFA0 = "always"
+		p.HideCorner = 30
+	case "hstk":
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill, p.HideCorner = 40, true, 30
+	case "hx40":
+
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+		p.HideCtr = 40
+	case "hcg":
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+		p.HideCover, p.HideGeo = 120, 60
+	case "hcgk":
+		p.FFA0 = "always"
+		p.HideStick, p.HideStill = 40, true
+		p.HideCover, p.HideGeo, p.HideCorner = 120, 60, 30
 	case "early3":
 		p.FFA0 = "always"
 		p.ShyHold = 25

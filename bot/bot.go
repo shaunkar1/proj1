@@ -124,6 +124,13 @@ type Params struct {
 	LateApproach    float64
 	PatientFinish   float64
 	ShyHold         float64
+	HideCover       float64
+	HideGeo         float64
+	HideStick       float64
+	HideStill       bool
+	HideCorner      float64
+	HideCtr         float64
+	HideRoof        float64
 	LateStrike      int
 	LateStrikeD     float64
 	LateStrikeHP    float64
@@ -393,6 +400,12 @@ type Bot struct {
 	readyGap      float64
 	shyMoveT      float64
 	shyMoveG      [2]float64
+	hideExpo      map[int]float32
+	hideCornerG   [2]float64
+	hideSurvC     [2]float64
+	hideSurvI     int
+	hideCornerT   float64
+	hideN         [4]int
 	safeSpot      [2]float64
 	safeT         float64
 	roamGoal      [2]float64
