@@ -1,5 +1,3 @@
-// Package mapdata embeds a copy of the arena so the bot still has a map if
-// the mounted one cannot be read.
 package mapdata
 
 import _ "embed"

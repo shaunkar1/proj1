@@ -31,7 +31,7 @@ func main() {
 			hid := true
 			for _, h := range []float64{1, 4.5, 8.5} {
 				for _, o := range []float64{-2.2, 0, 2.2} {
-					// lateral offsets across the line of sight
+
 					dx, dy := x-ex, y-ey
 					l := math.Hypot(dx, dy)
 					ox, oy := -dy/l*o, dx/l*o

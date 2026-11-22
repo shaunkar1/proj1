@@ -7,10 +7,8 @@ import (
 	"mechbot/proto"
 )
 
-// Debug, when set, prints a status line per decision to stderr.
 var Debug = os.Getenv("MECH_DEBUG") != ""
 
-// DebugSlot limits tracing to one slot (-1 = all).
 var DebugSlot = -1
 
 func (b *Bot) trace(act interface{}) {
@@ -38,7 +36,6 @@ func (b *Bot) trace(act interface{}) {
 		b.t, b.mode, me.HP, me.Energy, me.Pos[0], me.Pos[1], me.Pos[2], hyp(me.Vel[0], me.Vel[1], 0, 0), b.targetID, td, tl, thp, b.retreating, act)
 }
 
-// Info describes the last decision (for profiling tools).
 func (b *Bot) Info() string {
 	return fmt.Sprintf("mode=%s search=%v pathlen=%d tracks=%d proj=%d", b.mode, b.searchTick == b.o.Tick, len(b.path), len(b.tracks)*1000+b.dbgObj%1000, len(b.o.Projectiles))
 }

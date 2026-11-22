@@ -1,5 +1,3 @@
-// Package house holds stand-in opponents for the local simulator: a squad
-// that shares sightings and sends hunters, at several skill levels.
 package house
 
 import (
@@ -17,14 +15,13 @@ type Sight struct {
 	HP       float64
 }
 
-// Squad is the shared blackboard of the house bots in one match.
 type Squad struct {
-	Members  map[int]int     // id -> level (0 easy .. 3 expert)
-	Alive    map[int]float64 // last report time
+	Members  map[int]int
+	Alive    map[int]float64
 	Sight    map[int]*Sight
 	LateT    float64
-	Ramp     float64 // extra hunters per dead member
-	Aggro    int     // 0: non-hunters never fight; 1: only when hit or crowded; 2: whenever they see the enemy
+	Ramp     float64
+	Aggro    int
 	T        float64
 	hunters  map[int]bool
 	huntCalc float64
@@ -49,7 +46,6 @@ func (s *Squad) Report(o *proto.Obs) {
 	}
 }
 
-// Hunters: one at the start, more as members die, everyone late.
 func (s *Squad) IsHunter(id int, aliveTotal int) bool {
 	if s.T >= s.LateT {
 		return true
@@ -77,7 +73,7 @@ func (s *Squad) IsHunter(id int, aliveTotal int) bool {
 }
 
 type Skill struct {
-	AimNoise float64 // rad, correlated
+	AimNoise float64
 	Lead     float64
 	Strafe   float64
 	Range    float64
@@ -206,7 +202,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 	}
 	hunter := b.sq == nil || b.sq.IsHunter(me.ID, o.Alive)
 	muz := [3]float64{px, py, me.Pos[2] + me.Stats.MuzzleHeight}
-	// visible enemy
+
 	var tgt *proto.ActorObs
 	bd := 1e9
 	for i := range o.Mechs {
@@ -229,7 +225,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			}
 		}
 	}
-	// zone
+
 	z := o.Zone
 	var goal [2]float64
 	hasGoal := false
@@ -282,13 +278,13 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			}
 			st := b.sk.Strafe * b.sSign
 			mv = [2]float64{ux*rad - uy*st, uy*rad + ux*st}
-			// do not strafe into walls
+
 			if !b.w.Nav.Walkable(px+mv[0]*4, py+mv[1]*4) {
 				mv = [2]float64{ux*rad + uy*st, uy*rad - ux*st}
 				b.sSign = -b.sSign
 			}
 		}
-		// aim
+
 		if o.T >= b.noiT {
 			b.noiT = o.T + 0.35
 			b.noise = [2]float64{b.rng.NormFloat64() * b.sk.AimNoise, b.rng.NormFloat64() * b.sk.AimNoise * 0.6}
@@ -362,7 +358,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			mv = g
 		}
 	} else if !fight {
-		// hunt the shared sighting, else loot, else roam
+
 		var obj *[2]float64
 		arrive := 2.0
 		if hunter && b.sq != nil {
@@ -433,7 +429,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 						q := [2]float64{c.Pos[0], c.Pos[1]}
 						obj = &q
 						arrive = 12
-						// shoot it
+
 						if d < 60 {
 							yaw := math.Atan2(c.Pos[1]-py, c.Pos[0]-px)
 							pitch := math.Atan2(c.Pos[2]+1.2-muz[2], d)
@@ -476,7 +472,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			act.Aim = [2]float64{math.Atan2(mv[1], mv[0]) + math.Sin(o.T*0.9+float64(b.id))*1.2, 0}
 		}
 	}
-	// unstick
+
 	if math.Hypot(mv[0], mv[1]) > 0.3 && hyp(px, py, b.last[0], b.last[1]) < 0.08 {
 		b.stuck += 0.1
 	} else {

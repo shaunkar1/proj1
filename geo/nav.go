@@ -7,19 +7,18 @@ import (
 
 const NavStep = 2.0
 
-// Nav is a ground-level walkability grid (2 m cells) with A* search.
 type Nav struct {
 	W, H   int
 	MinX   float64
 	MinY   float64
 	Walk   []bool
-	Hgt    []float32        // walking surface height
-	Cost   []float32        // extra cost for hugging obstacles
-	Open   []float32        // metres to the nearest tall building
-	Adj    []uint8          // bit k set: the step to neighbour k is walkable
-	Comp   []int32          // connected component id (-1 blocked)
-	Main   int32            // id of the largest component
-	Exits  map[int32][]Exit // ways out of enclosed areas, by component
+	Hgt    []float32
+	Cost   []float32
+	Open   []float32
+	Adj    []uint8
+	Comp   []int32
+	Main   int32
+	Exits  map[int32][]Exit
 	g      []float32
 	stamp  []uint32
 	closed []uint32
@@ -68,7 +67,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 				continue
 			}
 			h := float64(w.H[rc])
-			// thin deck at walking height: stand on it
+
 			for _, iv := range w.iv[w.off[rc]:w.off[rc+1]] {
 				if float64(iv.Top) > h && float64(iv.Top)-float64(iv.Base) <= 3.5 && float64(iv.Top) < h+12 && float64(iv.Base) < h+bodyH {
 					h = float64(iv.Top)
@@ -88,8 +87,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 						ok = false
 						break scan
 					}
-					// terrain only matters under our centre (edges are checked
-					// separately); prisms need the full body clearance
+
 					for _, iv := range w.iv[w.off[pc]:w.off[pc+1]] {
 						if float64(iv.Top) > h+stepUp && float64(iv.Base) < h+bodyH {
 							ok = false
@@ -101,7 +99,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			nv.Walk[c] = ok
 		}
 	}
-	// walkable steps between neighbours: each 1 m of the way must be gentler than the slope limit
+
 	nv.Adj = make([]uint8, n)
 	lim := math.Tan(48 * math.Pi / 180)
 	for j := 0; j < nv.H; j++ {
@@ -126,7 +124,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 				}
 				ok := true
 				if nv.Hgt[c] == w.H[w.cell(x, y)] && nv.Hgt[nc] == w.H[w.cell(x+float64(o[0])*NavStep, y+float64(o[1])*NavStep)] {
-					// plain terrain on both ends: walk the segment in 1 m pieces
+
 					steps := 2
 					seg := math.Hypot(float64(o[0]), float64(o[1])) * NavStep / float64(steps)
 					prev := float64(nv.Hgt[c])
@@ -140,7 +138,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 						prev = hh
 					}
 				} else if math.Abs(float64(nv.Hgt[c]-nv.Hgt[nc])) > stepUp {
-					ok = false // on or off a deck: at most one step
+					ok = false
 				}
 				if ok {
 					nv.Adj[c] |= 1 << uint(k)
@@ -148,7 +146,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			}
 		}
 	}
-	// obstacle-hugging cost: distance (in cells) to nearest blocked cell
+
 	dist := make([]int8, n)
 	q := make([]int32, 0, n)
 	for c := 0; c < n; c++ {
@@ -187,7 +185,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			nv.Cost[c] = 0.2
 		}
 	}
-	// open ground: metres to the nearest tall building (cover against lasers)
+
 	nv.Open = make([]float32, n)
 	{
 		var q2 []int32
@@ -217,7 +215,7 @@ func (w *World) BuildNav(clearance, bodyH, stepUp float64) {
 			}
 		}
 	}
-	// components
+
 	for c := range nv.Comp {
 		nv.Comp[c] = -1
 	}
@@ -270,7 +268,6 @@ func (nv *Nav) neighbors(c int, f func(nc int, cost float32)) {
 	}
 }
 
-// stepOK reports whether moving from cell a to the adjacent cell b is walkable.
 func (nv *Nav) stepOK(a, b int) bool {
 	d := b - a
 	for k := 0; k < 8; k++ {
@@ -281,14 +278,12 @@ func (nv *Nav) stepOK(a, b int) bool {
 	return false
 }
 
-// Exit is a jet hop out of an enclosed area: stand at L, rise above H, fly to T.
 type Exit struct {
 	LX, LY, TX, TY float64
-	H              float64 // altitude to clear
-	Energy         float64 // rough energy cost
+	H              float64
+	Energy         float64
 }
 
-// MaxTopAlong returns the highest surface (terrain or prism) on the segment.
 func (w *World) MaxTopAlong(ax, ay, bx, by float64) float64 {
 	l := math.Hypot(bx-ax, by-ay)
 	n := int(l) + 1
@@ -302,7 +297,6 @@ func (w *World) MaxTopAlong(ax, ay, bx, by float64) float64 {
 	return m
 }
 
-// buildExits finds jet hops from every enclosed walkable pocket to open ground.
 func (w *World) buildExits(jetDrain, riseSpeed, maxEnergy float64) {
 	nv := w.Nav
 	nv.Exits = map[int32][]Exit{}
@@ -366,8 +360,6 @@ func (w *World) buildExits(jetDrain, riseSpeed, maxEnergy float64) {
 	}
 }
 
-// NearestIn returns the closest walkable cell of component comp (any
-// component if comp < 0) within maxR metres, or -1.
 func (nv *Nav) NearestIn(x, y, maxR float64, comp int32) int {
 	ok := func(c int) bool { return nv.Walk[c] && (comp < 0 || nv.Comp[c] == comp) }
 	c := nv.Cell(x, y)
@@ -425,13 +417,11 @@ func (nv *Nav) Walkable(x, y float64) bool {
 	return c >= 0 && nv.Walk[c]
 }
 
-// WalkableMain: walkable and part of the main connected area.
 func (nv *Nav) WalkableMain(x, y float64) bool {
 	c := nv.Cell(x, y)
 	return c >= 0 && nv.Walk[c] && nv.Comp[c] == nv.Main
 }
 
-// Nearest returns the closest main-component walkable cell within maxR metres, or -1.
 func (nv *Nav) Nearest(x, y, maxR float64) int {
 	c := nv.Cell(x, y)
 	if c >= 0 && nv.Walk[c] && nv.Comp[c] == nv.Main {
@@ -470,7 +460,6 @@ func (nv *Nav) Nearest(x, y, maxR float64) int {
 	return best
 }
 
-// WalkLine reports whether the straight segment stays on walkable cells.
 func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 	dx, dy := bx-ax, by-ay
 	l := math.Hypot(dx, dy)
@@ -490,12 +479,8 @@ func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 	return true
 }
 
-// Path runs A* from (sx,sy) to (gx,gy). Returns waypoints from start to goal
-// (cell centres) and the path cost in metres; nil if unreachable.
-// extra, if non-nil, adds a per-cell cost (danger fields).
 func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) float32) ([][2]float64, float64) {
-	// start from where we actually stand (even inside an enclosed pocket) and
-	// aim for the closest point of that same area to the goal
+
 	s := nv.NearestIn(sx, sy, 6, -1)
 	if s < 0 {
 		s = nv.Nearest(sx, sy, 40)
@@ -526,7 +511,7 @@ func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) flo
 		if dx < dy {
 			dx, dy = dy, dx
 		}
-		return float32(dx+0.4142*dy) * 1.25 // weighted: a little longer path, far fewer expansions
+		return float32(dx+0.4142*dy) * 1.25
 	}
 	nv.g[s] = 0
 	nv.stamp[s] = gen
@@ -586,8 +571,6 @@ func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) flo
 	return out, float64(nv.g[g]) * NavStep
 }
 
-// CloneScratch returns a World sharing all static data but with its own
-// search scratch space, so several goroutines can path-find at once.
 func (w *World) CloneScratch() *World {
 	c := *w
 	nv := *w.Nav

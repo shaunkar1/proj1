@@ -1,4 +1,3 @@
-// Command lab runs controlled two-mech experiments (dodging, aiming).
 package main
 
 import (

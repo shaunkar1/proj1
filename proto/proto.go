@@ -1,4 +1,3 @@
-// Package proto holds the mechfight/1 wire types.
 package proto
 
 import "encoding/json"
@@ -204,7 +203,7 @@ type Hello struct {
 		Files []string `json:"files"`
 	} `json:"map"`
 	Config Config `json:"config"`
-	Raw    []byte `json:"-"` // the line as received
+	Raw    []byte `json:"-"`
 }
 
 type WeaponObs struct {
@@ -346,7 +345,6 @@ type Obs struct {
 	Offer       *Offer      `json:"offer"`
 }
 
-// Action is what a bot answers. Pointers are optional fields.
 type Action struct {
 	Tick   int     `json:"tick"`
 	Move   Vec2    `json:"move"`

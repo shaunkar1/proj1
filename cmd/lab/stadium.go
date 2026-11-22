@@ -51,7 +51,7 @@ func main() {
 		}
 	}
 	fmt.Println(string(j.Stadium["openings"]))
-	// 1 m raster picture around the stadium: ground height / prism top
+
 	x0, x1, y0, y1 := -420.0, -130.0, -30.0, 290.0
 	sc := 3
 	img := image.NewRGBA(image.Rect(0, 0, int(x1-x0)*sc, int(y1-y0)*sc))

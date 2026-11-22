@@ -6,7 +6,6 @@ import (
 	"mechbot/proto"
 )
 
-// Starter is a port of the kit's Python example bot (the 1.15 baseline).
 type Starter struct {
 	Reach float64
 }

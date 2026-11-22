@@ -8,27 +8,26 @@ import (
 	"mechbot/geo"
 )
 
-// threat is an enemy as the movement planner sees it.
 type threat struct {
 	t      *Track
 	eye    [3]float64
-	weight float64 // how hostile (0..1)
+	weight float64
 	isTgt  bool
 }
 
 type moveCtx struct {
-	goal     *[2]float64 // nav goal (nil = hold area)
+	goal     *[2]float64
 	threats  []threat
 	target   *Track
-	wantLOS  float64 // + seek line of fire to target, - avoid
-	pref     float64 // preferred range to target (0 = none)
+	wantLOS  float64
+	pref     float64
 	strafe   bool
-	hide     bool // avoid all sight lines
+	hide     bool
 	boost    bool
 	wGoal    float64
-	arrive   float64 // stop within this distance of the goal
-	mustMove bool    // standing still is not an option (zone)
-	keepOff  float64 // stay at least this far from the goal point (crates: gun depression)
+	arrive   float64
+	mustMove bool
+	keepOff  float64
 }
 
 type zoneC struct {
@@ -36,7 +35,6 @@ type zoneC struct {
 	r float64
 }
 
-// zoneAt returns the zone circle at time t (within the current phase).
 func (b *Bot) zoneAt(t float64) zoneC {
 	z := &b.o.Zone
 	if t <= z.ShrinkStart || z.ShrinkEnd <= z.ShrinkStart {
@@ -48,7 +46,7 @@ func (b *Bot) zoneAt(t float64) zoneC {
 	if t >= z.ShrinkEnd {
 		return zoneC{z.NextCenter, z.NextRadius}
 	}
-	// the observed circle is already partway through the shrink at b.t
+
 	f := (t - b.t) / (z.ShrinkEnd - b.t)
 	if b.t < z.ShrinkStart {
 		f = (t - z.ShrinkStart) / (z.ShrinkEnd - z.ShrinkStart)
@@ -59,7 +57,6 @@ func (b *Bot) zoneAt(t float64) zoneC {
 
 func (z zoneC) outside(x, y float64) float64 { return hyp(x, y, z.c[0], z.c[1]) - z.r }
 
-// navTo returns a short-range steering point toward the goal.
 func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 	nv := b.w.Nav
 	me := b.me
@@ -75,7 +72,7 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 	if b.path == nil {
 		return gx, gy, false
 	}
-	// closest path point
+
 	bi, bd := 0, math.Inf(1)
 	for i, p := range b.path {
 		d := hyp(p[0], p[1], me.Pos[0], me.Pos[1])
@@ -83,7 +80,7 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 			bd, bi = d, i
 		}
 	}
-	// furthest point reachable in a straight walkable line within lookahead
+
 	best := bi
 	if bi+1 < len(b.path) {
 		best = bi + 1
@@ -101,8 +98,6 @@ func (b *Bot) navTo(gx, gy float64) (float64, float64, bool) {
 	return b.path[best][0], b.path[best][1], true
 }
 
-// navExtra is the per-cell extra cost for path search: cells we found blocked,
-// and ground the zone is about to take.
 func (b *Bot) navExtra() func(int) float32 {
 	nv := b.w.Nav
 	z := b.zoneAt(b.t + 4)
@@ -122,7 +117,7 @@ func (b *Bot) navExtra() func(int) float32 {
 			e += 12
 		}
 		if oc > 0 {
-			// stay within reach of something solid: lasers cannot be dodged in the open
+
 			if op := nv.Open[c]; op > 24 {
 				e += oc * float32(math.Min(float64(op-24)/30, 1))
 			}
@@ -131,8 +126,6 @@ func (b *Bot) navExtra() func(int) float32 {
 	}
 }
 
-// pathCostTo runs a path search and returns the walking distance (metres),
-// or -1 if unreachable.
 func (b *Bot) pathCostTo(gx, gy float64) float64 {
 	b.searchTick = b.o.Tick
 	p, c := b.w.Nav.Path(b.me.Pos[0], b.me.Pos[1], gx, gy, 30000, b.navExtra())
@@ -142,7 +135,6 @@ func (b *Bot) pathCostTo(gx, gy float64) float64 {
 	return c
 }
 
-// pathDist estimates walking distance to a point (cheap, straight-line based).
 func (b *Bot) roughDist(x, y float64) float64 {
 	d := hyp(x, y, b.me.Pos[0], b.me.Pos[1])
 	if d < 12 || b.w.Nav.WalkLine(b.me.Pos[0], b.me.Pos[1], x, y) {
@@ -155,14 +147,10 @@ func (b *Bot) exposed(eye [3]float64, x, y, z float64) bool {
 	return b.w.ClearCoarse(eye[0], eye[1], eye[2], x, y, z)
 }
 
-// peekOn: use enemy-laser timing and corner play?
 func (b *Bot) peekOn() bool {
 	return !b.P.NoPeek && !(b.practice && b.P.PracNoPeek)
 }
 
-// bodyExposed: could a shot from eye reach any part of our body standing at
-// (x,y) on ground gz? Tests the centre, the top and both flanks, because half
-// a mech sticking out past a corner is still a target.
 func (b *Bot) bodyExposed(eye [3]float64, x, y, gz float64) bool {
 	me := b.me
 	h := me.Stats.Height
@@ -180,20 +168,19 @@ func (b *Bot) bodyExposed(eye [3]float64, x, y, gz float64) bool {
 	return b.w.ClearCoarse(eye[0], eye[1], eye[2], x+px, y+py, cz) || b.w.ClearCoarse(eye[0], eye[1], eye[2], x-px, y-py, cz)
 }
 
-// steer picks the move direction by scoring sampled positions around us.
 func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	me := b.me
 	nv := b.w.Nav
 	px, py := me.Pos[0], me.Pos[1]
 	speed := me.Stats.WalkSpeed
 	onNav := nv.Walkable(px, py)
-	// off the walkable grid (roof, ledge, pocket): head for the nearest open ground
+
 	if !onNav {
 		c := nv.Nearest(px, py, 80)
 		if c >= 0 {
 			tx, ty := nv.Pos(c)
 			if ctx.goal != nil {
-				// prefer leaving in the goal's direction when several exits are similar
+
 				gc := nv.Nearest(px+(ctx.goal[0]-px)*0.15, py+(ctx.goal[1]-py)*0.15, 60)
 				if gc >= 0 {
 					gx, gy := nv.Pos(gc)
@@ -226,7 +213,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		z := b.o.Zone
 		fmt.Fprintf(os.Stderr, "NAV t=%.1f pos=(%.0f,%.0f) goal=(%.0f,%.0f) carrot=(%.0f,%.0f) has=%v pathlen=%d ok=%v zone=(%.0f,%.0f,%.0f)->(%.0f,%.0f,%.0f) %0.f-%.0f\n", b.t, px, py, gx, gy, carrot[0], carrot[1], hasCarrot, len(b.path), b.pathOK, z.Center[0], z.Center[1], z.Radius, z.NextCenter[0], z.NextCenter[1], z.NextRadius, z.ShrinkStart, z.ShrinkEnd)
 	}
-	// strafe side flips at random intervals
+
 	if b.t >= b.strafeT {
 		b.strafeSign = -b.strafeSign
 		if b.rng.Float64() < 0.3 {
@@ -246,7 +233,6 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	zSoon := b.zoneAt(b.t + 4.0)
 	myH := me.Stats.Height * 0.5
 
-	// incoming projectiles
 	var incs []inc
 	var dodgePen [17]float64
 	haveDodge := false
@@ -254,7 +240,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		p := &b.o.Projectiles[i]
 		rx, ry := px-p.Pos[0], py-p.Pos[1]
 		if p.Kind == "mortar" {
-			// integrate to impact
+
 			x, y, z := p.Pos[0], p.Pos[1], p.Pos[2]
 			vz := p.Vel[2]
 			tt := 0.0
@@ -277,7 +263,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			}
 			continue
 		}
-		// heading roughly at us?
+
 		vl := math.Hypot(p.Vel[0], p.Vel[1])
 		if vl < 1 {
 			continue
@@ -305,7 +291,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	}
 	type cand struct {
 		dx, dy, r float64
-		free      bool // the path's own next step: not subject to the straight-line check
+		free      bool
 	}
 	cands := make([]cand, 0, 40)
 	cands = append(cands, cand{0, 0, 0, false})
@@ -322,7 +308,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 	bestS := math.Inf(-1)
 	var bx, by float64
 	_ = 9.0
-	// laser timing: who could put a beam on us within the next moment, and is ours ready?
+
 	peek := b.peekOn()
 	myLasReady, haveLas := false, false
 	lasVal := 0.0
@@ -373,8 +359,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		if hasCarrot {
 			s -= ctx.wGoal * hyp(x, y, carrot[0], carrot[1])
 		} else if ctx.goal != nil {
-			// arrived: stay within the arrival ring, but do not keep closing on the point itself
-			// (closing on a crate put us on top of it, where the gun cannot be brought down)
+
 			gd := hyp(x, y, ctx.goal[0], ctx.goal[1])
 			if b.P.OldArrive {
 				s -= ctx.wGoal * 0.5 * gd
@@ -385,7 +370,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				s -= 6 * (ctx.keepOff - gd)
 			}
 		}
-		// zone (the path's own next step is trusted when we have to move)
+
 		if !(c.free && ctx.mustMove) {
 			if o := zNow.outside(x, y); o > -2 {
 				s -= 400 + 25*(o+2)
@@ -393,7 +378,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				s -= 60 + 8*(o2+4)
 			}
 		}
-		// threats and line of fire
+
 		for i := range ctx.threats {
 			th := &ctx.threats[i]
 			d := hyp(x, y, th.t.Pos[0], th.t.Pos[1])
@@ -405,7 +390,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				sc[ci].expTgt = exp
 			}
 			if !exp && peek && th.t.has[2] && !th.t.NPC {
-				// it is moving: will it have the line a moment from now?
+
 				e2 := [3]float64{th.eye[0] + th.t.Vel[0]*0.7, th.eye[1] + th.t.Vel[1]*0.7, th.eye[2]}
 				if b.bodyExposed(e2, x, y, gz) {
 					s -= 0.5 * 315 * math.Max(th.weight, 0.6) * boolf(b.laserIn(th.t) < 1.5)
@@ -413,7 +398,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			}
 			if exp {
 				if peek && th.t.has[2] {
-					// a beam is all-or-nothing: what matters is whether it can fire while we stand there
+
 					s -= b.P.WExpo * b.enemyDpsNL(th.t, d) * th.weight
 					if lt := b.laserIn(th.t); lt < 0.85 && d < 285 {
 						s -= 1.25 * 315 * b.cubeMul(th.t.Cubes) * math.Max(th.weight, 0.6)
@@ -437,11 +422,11 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 					}
 				}
 			}
-			// never let lightning carriers close in for free
+
 			if th.t.has[3] && d < 54 && !(th.isTgt && ctx.pref > 0 && ctx.pref < 50) {
 				s -= (54 - d) * 7
 			}
-			// keep clear of anyone we are not deliberately fighting up close
+
 			if !th.t.NPC && !(th.isTgt && ctx.pref < 60) && d < 60 {
 				s -= (60 - d) * 1.5
 			}
@@ -453,14 +438,14 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 			d := hyp(x, y, ctx.target.Pos[0], ctx.target.Pos[1])
 			wr := b.P.WRange
 			if peek && ctx.target.has[2] && b.coverNear {
-				wr *= 0.15 // cover matters more than range against a laser
+				wr *= 0.15
 			}
 			s -= wr * math.Abs(d-ctx.pref)
 		}
 		if ctx.strafe && c.r > 0 {
 			s += 5.0 * (c.dx*sdx + c.dy*sdy) * c.r / 5
 		}
-		// dodge: best achievable outcome if we start in this direction
+
 		if haveDodge {
 			key := 0
 			if c.r > 0 {
@@ -468,12 +453,12 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 				kr := math.Round(k)
 				key = 1 + (int(kr)+32)%16
 				if math.Abs(k-kr) > 0.01 {
-					// off-grid direction (the carrot): use the nearest sampled one
+
 				}
 			}
 			s -= dodgePen[key]
 		}
-		// inertia
+
 		if c.r > 0 {
 			s += 1.2 * (c.dx*b.lastMove[0] + c.dy*b.lastMove[1])
 		}
@@ -485,7 +470,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		}
 	}
 	b.coverNear = anyHid
-	// lurk at the corner: while hidden, stay close to a spot that has the line
+
 	lurk := peek && ctx.target != nil && ctx.wantLOS > 0 && anyExp && anyHid && (haveLas || ctx.target.has[2])
 	for ci, c := range cands {
 		if !sc[ci].ok {
@@ -512,7 +497,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		}
 	}
 	if math.IsInf(bestS, -1) {
-		// boxed in: head for the carrot / goal directly
+
 		if hasCarrot {
 			d := hyp(carrot[0], carrot[1], px, py)
 			if d > 0.1 {
@@ -541,10 +526,6 @@ var dirs16 = func() (d [17][2]float64) {
 	return
 }()
 
-// dodgePlan searches short movement sequences (a first direction held for one
-// decision, then two more legs) against every incoming round, and returns for
-// each first direction (0 = stop, 1..16 = compass) the least damage we can
-// still get away with.
 func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 	me := b.me
 	const dt = 0.05
@@ -554,7 +535,7 @@ func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 	}
 	R := me.Stats.Radius
 	nv := b.w.Nav
-	// round positions per step (segment start), and splash info
+
 	type rb struct {
 		px, py, vx, vy float64
 		z0, vz         float64
@@ -574,7 +555,7 @@ func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 	}
 	zLo, zHi := me.Pos[2]-1.0, me.Pos[2]+me.Stats.Height+1.0
 	splash := 10.0
-	// cost of being at (x,y) during step k
+
 	stepCost := func(k int, x, y float64) float64 {
 		c := 0.0
 		t0 := float64(k) * dt
@@ -627,7 +608,7 @@ func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 		s.y += s.vy * dt
 		return s
 	}
-	const leg1, leg2 = 2, 5 // steps: one decision, then 0.15 s, then the rest
+	const leg1, leg2 = 2, 5
 	var out [17]float64
 	s0 := st{me.Pos[0], me.Pos[1], me.Vel[0], me.Vel[1]}
 	onNav := nv.Walkable(s0.x, s0.y)
@@ -641,7 +622,7 @@ func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 		best := math.Inf(1)
 		for d2 := 0; d2 < 17; d2 += 2 {
 			if d2 > 0 {
-				d2-- // 0, then odd indices 1,3,..15 (8 compass directions)
+				d2--
 			}
 			s2 := s1
 			c2 := c1
@@ -677,7 +658,7 @@ func (b *Bot) dodgePlan(incs []inc, speed float64) [17]float64 {
 		}
 		out[d1] = best
 	}
-	// only the differences matter
+
 	mn := math.Inf(1)
 	for _, v := range out {
 		if v < mn {

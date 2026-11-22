@@ -1,4 +1,3 @@
-// Command bot speaks mechfight/1 on stdin/stdout.
 package main
 
 import (
@@ -88,8 +87,7 @@ func main() {
 
 	var pilot *bot.Bot
 	jobs := make(chan job, 1)
-	// the pilot runs on its own goroutine so a slow or crashing decision can
-	// never cost us the tick: the main loop answers with a safe action instead
+
 	go func() {
 		for j := range jobs {
 			func() {
@@ -109,7 +107,7 @@ func main() {
 	busy := false
 	var pending chan proto.Action
 	for ln := range lines {
-		// skip to the newest queued line of the same kind
+
 		newest := ln
 	drain:
 		for {
@@ -118,7 +116,7 @@ func main() {
 				if !ok {
 					break drain
 				}
-				// an end or hello must not be skipped
+
 				if len(newest) > 12 && (string(newest[:14]) == `{"type":"hello` || string(newest[:12]) == `{"type":"end`) {
 					handle(newest, &pilot, send)
 				}
@@ -143,12 +141,12 @@ func main() {
 			var o proto.Obs
 			err := json.Unmarshal(newest, &o)
 			if _, typeErr := err.(*json.UnmarshalTypeError); typeErr && o.Type == "obs" && len(o.Self.Weapons) > 0 {
-				// one field had an unexpected type; the rest decoded, so carry on with it
+
 				logf("odd field in obs: %v", err)
 				err = nil
 			}
 			if err != nil {
-				// never lose the tick over one odd field: answer with the last action
+
 				logf("bad obs: %v", err)
 				var tk struct {
 					Tick int `json:"tick"`
@@ -160,7 +158,7 @@ func main() {
 				continue
 			}
 			if busy {
-				// previous decision still running: see if it finished
+
 				select {
 				case <-pending:
 					busy = false

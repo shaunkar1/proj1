@@ -5,14 +5,11 @@ import (
 	"strings"
 )
 
-// Profile selects the squad-match (practice) tuning compiled into the bot.
-const Profile = "f75a220+g+s+d100+x3+ff+zg400+zt1795363320"
+const Profile = "base"
 
-// ApplyProfile adjusts only the parameters used in squad matches, so the
-// free-for-all behaviour is the same under every profile.
 func ApplyProfile(p *Params, name string) {
 	if strings.HasPrefix(name, "mix:") || strings.HasPrefix(name, "mixs:") || strings.HasPrefix(name, "mixl:") {
-		// a different profile per match, chosen when the match starts (see mixPick)
+
 		p.Mix = name
 		if parts := strings.Split(name, "|"); len(parts) > 1 {
 			ApplyProfile(p, parts[1])
@@ -428,8 +425,6 @@ var dmgFirst = []string{"laser_damage", "gun_damage", "gun_rate", "laser_charge"
 	"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
 
-// mixPick resolves a "mix:<M>:<assign>|P0|P1|..." profile for one match: matches fall into M groups by a
-// hash of the hello's seed and slot, and assign[g] (a digit) names the profile group g plays.
 func mixPick(mix string, seed int64, slot int) string {
 	parts := strings.Split(mix, "|")
 	hd := strings.Split(parts[0], ":")
@@ -442,7 +437,7 @@ func mixPick(mix string, seed int64, slot int) string {
 	}
 	hs := slot
 	if hd[0] == "mixs" {
-		hs = 0 // groups by the seed alone
+		hs = 0
 	}
 	x := uint64(seed)*0x9E3779B97F4A7C15 + uint64(hs)*0xBF58476D1CE4E5B9
 	x ^= x >> 30
@@ -452,7 +447,7 @@ func mixPick(mix string, seed int64, slot int) string {
 	x ^= x >> 31
 	g := int(x % uint64(m))
 	if hd[0] == "mixl" {
-		g = ((slot % m) + m) % m // groups by the slot alone
+		g = ((slot % m) + m) % m
 	}
 	c := hd[2][g]
 	k := int(c - '0')
@@ -465,5 +460,4 @@ func mixPick(mix string, seed int64, slot int) string {
 	return parts[1+k]
 }
 
-// MixPickX is mixPick for tools.
 func MixPickX(mix string, seed int64, slot int) string { return mixPick(mix, seed, slot) }

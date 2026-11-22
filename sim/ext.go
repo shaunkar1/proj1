@@ -9,8 +9,6 @@ import (
 	"mechbot/proto"
 )
 
-// ExtBot drives a mech with an external process speaking mechfight/1 on
-// stdin/stdout (a built bot binary), so versions can be played against each other.
 type ExtBot struct {
 	cmd *exec.Cmd
 	in  io.WriteCloser

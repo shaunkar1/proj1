@@ -53,12 +53,11 @@ func segCyl(a, b [3]float64, cx, cy, r, z0, z1 float64) (float64, bool) {
 }
 
 type target struct {
-	kind int // 0 mech 1 npc 2 crate
+	kind int
 	idx  int
 	t    float64
 }
 
-// firstHits returns entity hits along a→b sorted by t (only the nearest unless all).
 func (s *Sim) entityHit(a, b [3]float64, owner int, ownerNPC bool, skip map[int]bool) (target, bool) {
 	best := target{t: 2}
 	found := false
@@ -168,7 +167,6 @@ func rawStr(v string) json.RawMessage {
 	return b
 }
 
-// hurt applies weapon damage to a mech. from is the point the hit came from.
 func (s *Sim) hurt(m *Mech, amount float64, weapon string, by int, byNPC bool, from [3]float64, effect string) {
 	if !m.Alive {
 		return
@@ -585,7 +583,7 @@ func (s *Sim) moveMech(m *Mech) {
 	dt := s.DT
 	st := &m.Stats
 	sc := m.Scale(&s.Cfg)
-	// aim
+
 	dy := angDiff(m.CmdAim[0], m.Aim[0])
 	maxY := st.TurnRate * dt
 	if dy > maxY {
@@ -712,7 +710,7 @@ func (s *Sim) moveMech(m *Mech) {
 		z = nz
 	}
 	m.Pos = [3]float64{x, y, z}
-	// footsteps
+
 	if m.Grounded {
 		sp := math.Hypot(m.Vel[0], m.Vel[1])
 		if sp > s.Cfg.Sound.StepSpeed {
@@ -731,7 +729,7 @@ func (s *Sim) moveMech(m *Mech) {
 
 func (s *Sim) handleItems(m *Mech) {
 	a := &m.act
-	// offers
+
 	if len(m.offers) > 0 {
 		o := m.offers[0]
 		if !m.offerSet {
@@ -960,7 +958,7 @@ func (s *Sim) stepProjs() {
 		if wh {
 			if p.Kind == "mortar" {
 				hp := [3]float64{a[0] + (b[0]-a[0])*tw, a[1] + (b[1]-a[1])*tw, a[2] + (b[2]-a[2])*tw}
-				// back off slightly so the blast is outside geometry
+
 				hp[2] += 0.2
 				s.explode(hp, p, target{}, false)
 			}
@@ -1060,7 +1058,7 @@ func (s *Sim) Step() {
 			m.fresh = true
 		}
 	}
-	// supply drops
+
 	if s.dropIdx < len(cfg.Drops.Times) && s.T >= cfg.Drops.Times[s.dropIdx] {
 		s.dropIdx++
 		for tries := 0; tries < 500; tries++ {
@@ -1078,7 +1076,7 @@ func (s *Sim) Step() {
 		s.handleItems(m)
 		s.moveMech(m)
 	}
-	// push overlapping mechs apart
+
 	for i, a := range s.Mechs {
 		if !a.Alive {
 			continue
@@ -1118,7 +1116,7 @@ func (s *Sim) Step() {
 	s.stepProjs()
 	s.reapCrates()
 	s.stepZone()
-	// cubes
+
 	if len(s.Cubes) > 0 {
 		out := s.Cubes[:0]
 		for _, c := range s.Cubes {
@@ -1143,7 +1141,7 @@ func (s *Sim) Step() {
 		}
 		s.Cubes = out
 	}
-	// drops
+
 	if len(s.Drops) > 0 {
 		out := s.Drops[:0]
 		for _, d := range s.Drops {
@@ -1183,7 +1181,7 @@ func (s *Sim) Step() {
 		}
 		s.Drops = out
 	}
-	// zone, regen, energy
+
 	dps := s.zoneDPS()
 	for _, m := range s.Mechs {
 		if !m.Alive {
@@ -1213,7 +1211,7 @@ func (s *Sim) Step() {
 			}
 		}
 	}
-	// deaths
+
 	dead := 0
 	for _, m := range s.Mechs {
 		if m.Alive && m.HP <= 0 {
@@ -1257,7 +1255,7 @@ func (s *Sim) Step() {
 	s.T = float64(s.Tick) * dt
 	if s.Alive <= 1 || s.T >= cfg.Match.DurationS {
 		s.Done = true
-		// rank survivors by HP
+
 		var surv []*Mech
 		for _, m := range s.Mechs {
 			if m.Alive {

@@ -1,6 +1,5 @@
 package sim
 
-// Recorder keeps a light trace of a match for offline viewing.
 type Recorder struct {
 	Frames []Frame
 }
@@ -8,7 +7,7 @@ type Recorder struct {
 type Frame struct {
 	T     float64
 	Zone  [3]float64
-	Mechs [][5]float64 // x, y, z, hp, yaw (alive only; id implied by order with -1 hp for dead)
+	Mechs [][5]float64
 }
 
 func (r *Recorder) frame(s *Sim) {
