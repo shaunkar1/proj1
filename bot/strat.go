@@ -392,6 +392,7 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 	}
+	b.e8Update()
 	b.boss = nil
 	b.peer = nil
 	bossD := 1e9
@@ -430,6 +431,13 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 	}
+	if b.P.EndRefuse > 0 && b.ffaSure && !b.practice && o.Alive == 2 && b.e8T == nil {
+
+		if t := b.e8Opp(); t != nil && b.t-t.Seen < 15 && t.Seen > b.e8SiteT+0.15 && b.e8Ratio(t) > b.P.EndRefuse {
+
+			b.boss, bossD = t, hyp(px, py, t.Pos[0], t.Pos[1])
+		}
+	}
 	boss := b.boss
 	b.patient = b.P.Endgame > 0 && b.sawOtherDeath && o.Alive <= b.P.Endgame && o.Alive > 2
 	if b.P.EndgameFFA > 0 && b.ffaSure && b.othersDied > 0 && o.Alive <= b.P.EndgameFFA && o.Alive > 2 {
@@ -456,6 +464,10 @@ func (b *Bot) decide(act *proto.Action) {
 		if v > bestV {
 			bestV, tgt = v, t
 		}
+	}
+	if tgt == nil && b.e8T != nil && b.t-b.e8T.Seen < 12 {
+
+		tgt = b.e8T
 	}
 	if tgt != nil {
 		b.targetID = tgt.ID
@@ -525,6 +537,13 @@ func (b *Bot) decide(act *proto.Action) {
 		zoneGo = true
 	}
 	zoneUrgent := zoneGo && (zoneLate || b.zoneAt(b.t+6).outside(px, py) > -3)
+	zoneQuiet := false
+	if b.P.QuietWalk > 0 && b.P.QuietWalkZone && b.ffaSure && !b.practice && zoneGo && !zoneUrgent && b.t > b.P.QuietWalkT {
+
+		v := math.Min(b.P.QuietWalk, me.Stats.WalkSpeed)
+		extra := b.zonePathC/v*1.1 - b.zonePathC/me.Stats.WalkSpeed*1.1
+		zoneQuiet = budget-extra <= 0
+	}
 	if zoneGo && b.ffaSure && !b.practice && b.P.ZoneLead > 0 && budget < b.P.ZoneLead {
 
 		zoneUrgent = true
@@ -631,6 +650,14 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	_ = adv
+	if b.e8T != nil && tgt == b.e8T {
+
+		engage = true
+		b.retreating = false
+	}
+	if b.e8Las != nil && tgt == b.e8Las && b.t >= tgt.Hostile {
+		engage = false
+	}
 	retreatHP := b.P.RetreatHP
 	if b.practice {
 		if b.P.PracRetreatHP >= 0 {
@@ -646,6 +673,9 @@ func (b *Bot) decide(act *proto.Action) {
 			b.retreating = true
 		}
 	} else if hpFrac > b.P.ReengageHP || (len(mechs) == 0 && b.t-b.lastDmgT > 6 && hpFrac > 0.55) {
+		b.retreating = false
+	}
+	if b.e8T != nil && tgt == b.e8T {
 		b.retreating = false
 	}
 	if tgt != nil && !engage && !finishing && (incoming > 0 || b.t-b.lastDmgT < 3) {
@@ -723,10 +753,18 @@ func (b *Bot) decide(act *proto.Action) {
 	ffaDrop := b.P.FFADrop > 0 && b.ffaSure && !b.practice && hpFrac < b.P.FFADrop && boss == nil
 
 	ffaFree := b.P.FFADropFree > 0 && b.ffaSure && !b.practice && !ffaDrop && boss == nil && tgt == nil && nHostile == 0 && hpFrac > 0.5 && b.t-b.lastDmgT > 6
+
+	e8Drop := b.P.EndDrop > 0 && b.P.FFADropFree <= 0 && b.ffaSure && !b.practice && o.Alive <= b.P.EndDrop && !ffaDrop && tgt == nil && nHostile == 0 && hpFrac > 0.5 && b.t-b.lastDmgT > 6
+	if e8Drop {
+		ffaFree = true
+	}
 	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop) || ffaDrop || ffaFree {
 		bd := b.P.PracDropD
 		if ffaFree {
 			bd = b.P.FFADropFreeD
+		}
+		if e8Drop {
+			bd = b.P.EndDropD
 		}
 		for i := range o.Drops {
 			d := &o.Drops[i]
@@ -734,7 +772,10 @@ func (b *Bot) decide(act *proto.Action) {
 			if dist >= bd || zEnd.outside(d.Pos[0], d.Pos[1]) > -4 {
 				continue
 			}
-			if ffaFree && ((d.Holder != nil && *d.Holder != me.ID) || !b.dropClear(d.Pos[0], d.Pos[1], dist) || b.roughDist(d.Pos[0], d.Pos[1]) >= bd) {
+			if ffaFree && !e8Drop && ((d.Holder != nil && *d.Holder != me.ID) || !b.dropClear(d.Pos[0], d.Pos[1], dist) || b.roughDist(d.Pos[0], d.Pos[1]) >= bd) {
+				continue
+			}
+			if e8Drop && ((d.Holder != nil && *d.Holder != me.ID) || !b.e8DropClear(d.Pos[0], d.Pos[1], dist) || b.roughDist(d.Pos[0], d.Pos[1]) >= bd) {
 				continue
 			}
 			if ffaDrop {
@@ -771,6 +812,21 @@ func (b *Bot) decide(act *proto.Action) {
 			bd, dropGo = dist, d
 		}
 	}
+	e8Stalk := false
+	var e8G [2]float64
+	if b.P.EndStalk > 0 && b.ffaSure && !b.practice && o.Alive == 3 && (b.endLow || b.patient) && hpFrac >= 0.9 && b.t-b.lastDmgT > 8 && nHostile == 0 && !b.retreating && (tgt == nil || tgt == b.e8Las) {
+		if g, _, ok := b.e8StalkGoal(zEnd); ok {
+			e8Stalk, e8G = true, g
+			for _, t := range b.trackL {
+				if t.NPC || t.Ghost || b.t-t.Seen > 3 {
+					continue
+				}
+				if b.t < t.Hostile || hyp(px, py, t.Pos[0], t.Pos[1]) < 80 {
+					e8Stalk = false
+				}
+			}
+		}
+	}
 	switch {
 	case zoneUrgent:
 		mode = "zone"
@@ -785,6 +841,11 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.target = tgt
 			ctx.strafe = false
 		}
+	case zoneQuiet && tgt == nil && nHostile == 0 && !underFire && !b.retreating:
+		mode = "zone"
+		goal, hasGoal = zoneGoal, true
+		ctx.wGoal = 4
+		ctx.mustMove = true
 	case dropGo != nil:
 		mode = "drop"
 		goal, hasGoal = [2]float64{dropGo.Pos[0], dropGo.Pos[1]}, true
@@ -815,6 +876,15 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.boost = me.Energy > 10
 		ctx.wGoal = 1.5
 		ctx.mustMove = true
+	case e8Stalk:
+
+		mode = "stalk"
+		goal, hasGoal = e8G, true
+		ctx.arrive = 4
+		ctx.wGoal = 2
+		if tgt != nil {
+			ctx.target = tgt
+		}
 	case boss == nil && b.peer != nil && peerD < b.P.PeerAvoidD && b.peer.LOS && b.t-b.peer.Seen < 1.5 && !(tgt == b.peer && finishing) && tgt != b.peer:
 
 		mode = "avoid"
@@ -925,11 +995,39 @@ func (b *Bot) decide(act *proto.Action) {
 		if chase && d > prefD+15 && me.Energy > 35 {
 			ctx.boost = true
 		}
-		if zoneGo {
+		if b.e8T != nil && tgt == b.e8T && !tgt.LOS {
+			goal, hasGoal = [2]float64{tgt.Pos[0], tgt.Pos[1]}, true
+			ctx.arrive = 8
+			ctx.wGoal = 3
+			ctx.mustMove = true
+			if d > 80 && me.Energy > 50 && !b.holds("lightning") {
+				ctx.boost = true
+			}
+
+			var th2 []threat
+			for i := range ctx.threats {
+				if ctx.threats[i].t != tgt {
+					th2 = append(th2, ctx.threats[i])
+				}
+			}
+			ctx.threats = th2
+		} else if zoneGo {
 
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 0.6
 		}
+	case (b.e8T != nil && tgt == nil) || (b.e8Go && tgt == nil):
+
+		mode = "pounce"
+		if b.e8T != nil {
+			goal, hasGoal = [2]float64{b.e8T.Pos[0], b.e8T.Pos[1]}, true
+		} else {
+			goal, hasGoal = b.e8Site, true
+		}
+		ctx.arrive = 10
+		ctx.wGoal = 3
+		ctx.mustMove = hyp(px, py, goal[0], goal[1]) > 12
+		ctx.boost = me.Energy > 50 && hyp(px, py, goal[0], goal[1]) > 80 && !b.holds("lightning")
 	case b.fleeFrom(mechs, hpFrac) != nil || (b.t < b.fleeUntil && b.ffaSure && !b.practice && b.P.FleeD > 0):
 
 		from := b.fleeFrom(mechs, hpFrac)
@@ -1375,6 +1473,21 @@ func (b *Bot) decide(act *proto.Action) {
 		hyp(px, py, goal[0], goal[1]) <= 3 && len(b.o.Projectiles) == 0 && b.t-b.lastDmgT > 3 {
 		mx, my, boost = 0, 0, false
 	}
+	if v := b.P.QuietWalk; v > 0 && b.ffaSure && !b.practice && b.t > b.P.QuietWalkT && (!b.P.QuietWalkQ || b.quiet) && me.Grounded && !climbing && !bolt &&
+		b.t >= b.unstickT && b.stuckT <= 0.5 && !zoneUrgent && !underFire && b.t-b.lastDmgT > 5 && nHostile == 0 && tgt == nil && len(b.o.Projectiles) == 0 {
+		switch mode {
+		case "fight", "flee", "retreat", "escape", "evade", "avoid", "zbolt", "hop", "climb", "break", "pounce", "stalk":
+		default:
+
+			boost = false
+			b.quietWalkN++
+			if ws := me.Stats.WalkSpeed; ws > v {
+				if l, f := math.Hypot(mx, my), v/ws; l > f {
+					mx, my = mx*f/l, my*f/l
+				}
+			}
+		}
+	}
 	if !me.Grounded && b.t >= b.unstickT && !climbing && !bolt {
 
 		boost = false
@@ -1540,6 +1653,10 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	if !shot {
 		b.scan(act, hasGoal, goal)
+		if mode == "stalk" && b.t-b.e8FightT < 4 {
+
+			act.Aim = [2]float64{angDiff(math.Atan2(b.e8Fight[1]-py, b.e8Fight[0]-px)+0.5*math.Sin(b.scanPhase*1.1), 0), 0}
+		}
 	}
 
 	if gun, _ := b.weapon("gun"); gun != nil && gun.Reload <= 0 && gun.Ammo < gun.Stats.Mag {
@@ -1562,12 +1679,17 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	}
 	b.dbg = mode
+	b.e8Trace()
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
 	}
 }
 
 func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
+	if b.e8T != nil && t == b.e8T {
+		t.Hostile = math.Max(t.Hostile, b.t+8)
+		return true
+	}
 	if b.patient {
 
 		fin := 0.3
@@ -1579,6 +1701,9 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 		}
 		if b.lateStrike(t, d, hpFrac) {
 			t.Hostile = math.Max(t.Hostile, b.t+8)
+			return true
+		}
+		if b.P.EndThird > 0 && b.e8Third(t, d, hpFrac) {
 			return true
 		}
 		return false

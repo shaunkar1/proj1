@@ -618,6 +618,17 @@ func Variant(name string) Params {
 	case "sh25":
 		p.FFA0 = "always"
 		p.ShyHold = 25
+	case "qw46", "qw46q", "qwb", "qw46z", "qw46n":
+		p.FFA0 = "always"
+		p.QuietWalk, p.QuietWalkT, p.QuietWalkZone = 4.6, 30, true
+		switch name {
+		case "qw46q":
+			p.QuietWalkQ = true
+		case "qwb":
+			p.QuietWalk = 99
+		case "qw46n":
+			p.QuietWalkZone = false
+		}
 	case "hs40":
 
 		p.FFA0 = "always"
@@ -766,6 +777,28 @@ func Variant(name string) Params {
 		p.ZoneGoalIn = false
 		p.HushT = 0
 		p.FleeD = 0
+	case "e8p", "e8p1", "e8ps", "e8pt", "e8pst", "e8pr", "e8d", "e8all", "e8s", "e8t", "e8r", "e8psr", "e8pd":
+
+		p.FFA0 = "always"
+		has := func(c string) bool { return name == "e8all" || strings.Contains(name[2:], c) }
+		if has("p") {
+			p.EndPounce, p.EndRushD, p.EndPounceT = 0.85, 110, 12
+			if name == "e8p1" {
+				p.EndPounce = 1.0
+			}
+		}
+		if has("s") {
+			p.EndStalk = 150
+		}
+		if has("t") {
+			p.EndThird = 100
+		}
+		if has("r") {
+			p.EndRefuse = 1.25
+		}
+		if has("d") {
+			p.EndDrop, p.EndDropD = 4, 160
+		}
 	case "zg":
 
 		p.FFA0 = "always"
