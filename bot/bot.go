@@ -1048,6 +1048,8 @@ func (b *Bot) wallClock(o *proto.Obs) {
 	b.wallMed, b.wallMin = math.Max(d[len(d)/2], 0.01), math.Max(d[0], 0.01)
 }
 
+const Build = 1
+
 func gapCode(ms float64) float64 {
 	if ms <= 0 {
 		return 0

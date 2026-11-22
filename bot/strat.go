@@ -2230,6 +2230,9 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 				act.Aim[1] = wallCode(b.wallMed)
 			case b.t >= 1.15 && b.t < 1.42:
 				act.Aim[1] = wallCode(b.wallMin)
+			case b.t >= 1.45 && b.t < 1.68 && b.ffaSure && !b.practice:
+
+				act.Aim[1] = -0.03 * Build
 			}
 		}
 		if b.cfgN > 0 {
