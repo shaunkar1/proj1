@@ -12,6 +12,7 @@ type samp struct {
 	x, y      float64
 	hp, maxhp float64
 	cubes     int
+	shots     int
 }
 
 type mrec struct {
@@ -68,7 +69,7 @@ type hitRec struct {
 func sample(s *sim.Sim) []samp {
 	row := make([]samp, len(s.Mechs))
 	for i, m := range s.Mechs {
-		row[i] = samp{m.Alive, m.Pos[0], m.Pos[1], m.HP, m.MaxHP, m.Cubes}
+		row[i] = samp{m.Alive, m.Pos[0], m.Pos[1], m.HP, m.MaxHP, m.Cubes, m.Shots}
 	}
 	return row
 }
@@ -220,4 +221,79 @@ func matchStats(s *sim.Sim, names map[int]string, pos [][]samp) ([]mrec, []engRe
 		raw = append(raw, []interface{}{math.Round(h.t*10) / 10, h.a, h.b, int(h.amt), h.w})
 	}
 	return ms, engs, raw
+}
+
+func gunfireStats(s *sim.Sim, pos [][]samp, farm map[int][]float64) []int {
+	out := make([]int, 18)
+	n := len(s.Mechs)
+	type mh struct {
+		t    float64
+		a, b int
+	}
+	var hits []mh
+	for _, m := range s.Mechs {
+		for _, d := range m.DmgLog {
+			if d.By >= 0 && d.By < 100 && d.By != m.ID && d.T < 80 {
+				hits = append(hits, mh{d.T, d.By, m.ID})
+			}
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool { return hits[i].t < hits[j].t })
+	for i := 0; i < n; i++ {
+		for t := 5; t <= 60; t += 5 {
+			if t >= len(pos) || !pos[t][i].alive {
+				break
+			}
+			ft := float64(t)
+			busy := false
+			att, found := false, false
+			for _, h := range hits {
+				if h.a != i && h.b != i {
+					continue
+				}
+				if h.t > ft-10 && h.t <= ft {
+					busy = true
+					break
+				}
+				if h.t > ft && h.t <= ft+15 && !found {
+					found, att = true, h.b == i
+				}
+			}
+			if busy {
+				continue
+			}
+			near := 1e9
+			for j := 0; j < n; j++ {
+				if j != i && pos[t][j].alive {
+					if d := math.Hypot(pos[t][i].x-pos[t][j].x, pos[t][i].y-pos[t][j].y); d < near {
+						near = d
+					}
+				}
+			}
+			band := 2
+			if near < 100 {
+				band = 0
+			} else if near < 200 {
+				band = 1
+			}
+			grp := 1
+			t0 := t - 10
+			if t0 < 0 {
+				t0 = 0
+			}
+			if pos[t][i].shots > pos[t0][i].shots {
+				grp = 2
+			}
+			for _, ft2 := range farm[i] {
+				if ft2 > ft-10 && ft2 <= ft {
+					grp = 0
+				}
+			}
+			out[(band*3+grp)*2]++
+			if att {
+				out[(band*3+grp)*2+1]++
+			}
+		}
+	}
+	return out
 }

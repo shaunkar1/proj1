@@ -37,12 +37,20 @@ var slowLog = func() int { n, _ := strconv.Atoi(os.Getenv("SLOWLOG")); return n 
 
 type timed struct {
 	inner sim.Controller
+	farm  []float64
 	max   time.Duration
 	sum   time.Duration
 	n     int
 }
 
 func (t *timed) Act(o *proto.Obs) proto.Action {
+	if o.T < 80 {
+		for i := range o.Events {
+			if e := &o.Events[i]; e.Type == "hit" && e.Target >= 100 && (len(t.farm) == 0 || o.T-t.farm[len(t.farm)-1] > 0.2) {
+				t.farm = append(t.farm, o.T)
+			}
+		}
+	}
 	t0 := time.Now()
 	a := t.inner.Act(o)
 	d := time.Since(t0)
@@ -155,6 +163,7 @@ func main() {
 			for sd := range jobs {
 				var tm []*timed
 				var posLog [][]samp
+				farmOf := map[int]*timed{}
 				var dumpW *bufio.Writer
 				var exts []*sim.ExtBot
 				names := map[int]string{}
@@ -276,6 +285,7 @@ func main() {
 					}
 					t := &timed{inner: bot.New(h, w, bot.Variant(v))}
 					tm = append(tm, t)
+					farmOf[slot] = t
 					return t, v
 				}
 				s := sim.New(w, &hello, sd, mk)
@@ -322,7 +332,12 @@ func main() {
 				mu.Lock()
 				if statW != nil || *mlines {
 					ms, engs, hits := matchStats(s, names, posLog)
-					out := map[string]interface{}{"seed": sd, "mechs": ms, "eng": engs, "len": math.Round(s.T*10) / 10}
+					farm := map[int][]float64{}
+					for id, t := range farmOf {
+						farm[id] = t.farm
+					}
+					gf := gunfireStats(s, posLog, farm)
+					out := map[string]interface{}{"seed": sd, "mechs": ms, "eng": engs, "len": math.Round(s.T*10) / 10, "gf": gf}
 					if *mlines {
 
 						b01 := func(v bool) int {
@@ -338,7 +353,7 @@ func main() {
 						for _, e := range engs {
 							ce = append(ce, []interface{}{e.T, e.A, e.B, e.D, e.ClA, e.ClB, b01(e.Near), e.NC, b01(e.Weak), b01(e.Few), e.MC, e.TC, e.NAlive})
 						}
-						jb, _ := json.Marshal(map[string]interface{}{"seed": sd, "m": cm, "e": ce})
+						jb, _ := json.Marshal(map[string]interface{}{"seed": sd, "m": cm, "e": ce, "gf": gf})
 						fmt.Printf("#M %s\n", jb)
 					}
 					if statW != nil {
