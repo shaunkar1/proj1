@@ -103,6 +103,7 @@ func main() {
 	cand := flag.String("cand", "paw", "candidate variant(s), comma separated (ffa: the field)")
 	workers := flag.Int("j", 2, "parallel matches")
 	verbose := flag.Bool("v", false, "log deaths")
+	shuffle := flag.Bool("shuffle", false, "ffa: seat the candidates in a new random order every match")
 	stream := flag.String("hello", "/home/claude/kit/mechfight-kit/check/stream.jsonl.gz", "recorded stream with a hello")
 	late := flag.Float64("late", 290, "squad all-hunt time")
 	expert := flag.String("expert", "paw", "variant used for expert house bots")
@@ -232,6 +233,24 @@ func main() {
 						}
 					}
 					v := cands[(slot+int(sd))%len(cands)]
+					if *shuffle {
+						// a different seating every match, so no candidate keeps the same neighbours
+						idx := make([]int, len(cands))
+						for i := range idx {
+							idx[i] = i
+						}
+						x := uint64(sd)*0x9E3779B97F4A7C15 + 0x1234567
+						for i := len(idx) - 1; i > 0; i-- {
+							x ^= x >> 30
+							x *= 0xBF58476D1CE4E5B9
+							x ^= x >> 27
+							x *= 0x94D049BB133111EB
+							x ^= x >> 31
+							j := int(x % uint64(i+1))
+							idx[i], idx[j] = idx[j], idx[i]
+						}
+						v = cands[idx[slot%len(cands)]]
+					}
 					names[slot] = v
 					if strings.HasPrefix(v, "ext:") {
 						e := sim.NewExtBot(v[4:], h)
