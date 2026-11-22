@@ -112,6 +112,8 @@ type Params struct {
 	HurtHP          float64 // known free-for-all: below this health fraction (and hit in the last 40 s with a threat around) only nearby errands; 0 = the usual 0.7
 	HitMem          float64 // known free-for-all: for this many seconds after a mech hit us, no errand that ends closer to it
 	LtnObjD         float64 // known free-for-all: no errand that ends within this distance of a lightning holder (unless we hold lightning)
+	LateApproach    float64 // late strike: a mech closing on us at this speed (m/s) or more is struck first even when somewhat stronger (0 = off)
+	PatientFinish   float64 // patient phase: a mech below this health fraction within reach is finished off (0 = the usual 0.3)
 	LateStrike      int     // known free-for-all, patient phase: with this many or fewer alive, a laser and plenty of health, fire first on a lone mech that is not stronger (0 = never)
 	LateStrikeD     float64 // ... within this distance
 	LateStrikeHP    float64 // ... when our health fraction is at least this
@@ -185,7 +187,7 @@ func baseParams() Params {
 		UpgradePrio: []string{"plating", "armor", "laser_damage", "laser_charge", "nanites", "gun_damage", "gun_rate", "lightning_efficiency",
 			"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
-		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}, // no mortar: carrying one makes every laser hit 60% worse
+		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5},
 		LeadScale:  1.0,
 		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietAlive: 6, QuietCap: 300, EndgameFFA: 16, QuietAdvD: 50, FleeLaser: 1, QuietNoClose: true, QuietNoChase: true, SafeAway: 1.0, LateStrikeD: 130, LateStrikeHP: 0.8, LateStrikeRatio: 1.0, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
@@ -483,7 +485,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			b.tracks[a.ID] = t
 		}
 		if !t.NPC && !t.Ghost && o.T-t.Seen < 0.35 && a.HP < t.HP-20 && o.T-t.IHit > 0.45 {
-			t.busyT = o.T // someone else is hurting it
+			t.busyT = o.T
 		}
 		t.Ghost = false
 		t.PrevVel = t.Vel
@@ -499,7 +501,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 		t.AvgVel[0] = 0.85*t.AvgVel[0] + 0.15*a.Vel[0]
 		t.AvgVel[1] = 0.85*t.AvgVel[1] + 0.15*a.Vel[1]
 		if o.T-t.Seen > 0.25 {
-			t.hn = 0 // gap in the data: restart the history
+			t.hn = 0
 		}
 		t.hist[t.hn%len(t.hist)] = histRec{o.T, a.Pos, a.Vel}
 		t.hn++
@@ -525,7 +527,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 		}
 		c := t.Center()
 		tp := t.Top()
-		// which part of it can we hit? centre, top, or either flank
+
 		t.aimOff = [3]float64{}
 		t.LOS = b.w.Clear(b.muz[0], b.muz[1], b.muz[2], c[0], c[1], c[2])
 		if !t.LOS && b.w.Clear(b.muz[0], b.muz[1], b.muz[2], tp[0], tp[1], tp[2]) {
@@ -560,7 +562,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 				t.aimedAt = math.Max(0, t.aimedAt-0.05)
 			}
 			if a.Charging && off > 0.6 {
-				t.busyT = o.T // lining up on somebody else
+				t.busyT = o.T
 			}
 			if t.aimedAt >= 0.6 && !(b.P.QuietNoAim && b.quiet && b.ffaSure && !a.Charging && d > 60) {
 				t.Hostile = math.Max(t.Hostile, o.T+8)
@@ -570,7 +572,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			}
 		}
 	}
-	// drones stay near home: remember where we saw them (two cubes each)
+
 	if b.npcMem == nil {
 		b.npcMem = map[int]*Item{}
 	}
@@ -600,7 +602,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 		}
 		t.DmgToMe *= 0.97
 	}
-	// items: refresh seen ones; forget ones that should be visible but are not
+
 	seenP := map[int]bool{}
 	for _, p := range o.Pickups {
 		seenP[p.ID] = true
@@ -650,7 +652,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			delete(b.cubes, id)
 		}
 	}
-	// events
+
 	for i := range o.Events {
 		e := &o.Events[i]
 		switch e.Type {
@@ -667,7 +669,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 				b.lastDmgBy = *e.By
 				t := b.tracks[*e.By]
 				if *e.By < 100 && e.Bearing != nil && (t == nil || o.T-t.Seen > 0.35 || t.Ghost) {
-					// shot by something we cannot see: place a ghost along the bearing
+
 					d := 110.0
 					switch e.Weapon {
 					case "lightning":
@@ -747,7 +749,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			b.ffaSure = true
 		}
 	}
-	// practice = everyone else is one squad: nobody dies unless we kill them
+
 	b.practice = !b.sawOtherDeath && o.T > 20
 	for _, s := range o.Sounds {
 		if s.Kind == "death" && b.P.Sites && !b.practice {
@@ -799,7 +801,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 	}
 	b.decide(&act)
 	if b.P.MoveJit != 0 && !b.ffaSure && (act.Move[0] != 0 || act.Move[1] != 0) {
-		// a different but equally good run of the same match: same decisions, steps a hair to one side
+
 		x := uint64(b.P.MoveJit)*0x9E3779B97F4A7C15 + uint64(o.Tick)*0xBF58476D1CE4E5B9 + uint64(int64(b.seed))*0x94D049BB133111EB + uint64(b.slot)
 		x ^= x >> 30
 		x *= 0xBF58476D1CE4E5B9
@@ -824,7 +826,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		act.Fire = [2]bool{}
 	}
 	if b.P.PracStopKills > 0 && b.practice && b.kills >= b.P.PracStopKills {
-		// measurement runs: stop playing after this many kills
+
 		act.Move = proto.Vec2{}
 		act.Jump = false
 		act.Boost = false
@@ -874,7 +876,7 @@ func (b *Bot) ffaByClock() bool {
 		}
 	}
 	if len(b.P.FFA0) > 3 && b.P.FFA0[:3] == "gap" {
-		// the first observation came long after we were ready: the server was waiting for other teams' bots
+
 		if v, err := strconv.Atoi(b.P.FFA0[3:]); err == nil {
 			return b.readyGap > float64(v)
 		}
@@ -886,19 +888,19 @@ func (b *Bot) ffaByClock() bool {
 // something about the matches the scorer runs.
 func (b *Bot) probeStop() bool {
 	if len(b.P.Probe) > 1 && b.P.Probe[0] == 't' {
-		// stop at a set time: the score is then the kills made by that time
+
 		if v, err := strconv.Atoi(b.P.Probe[1:]); err == nil {
 			return b.t >= float64(v)
 		}
 	}
 	if len(b.P.Probe) > 2 && b.P.Probe[:2] == "dt" {
-		// stop when the server ticks slower than this many milliseconds
+
 		if v, err := strconv.Atoi(b.P.Probe[2:]); err == nil {
 			return b.wallMed > float64(v)
 		}
 	}
 	if b.P.Probe == "tm" {
-		// ... or when either clock looks unlike a quiet server: slow ticks, or a long wait for the first one
+
 		return b.wallMed > 4 || b.readyGap > 150
 	}
 	switch b.P.Probe {
@@ -957,7 +959,7 @@ func (b *Bot) heardMech(kind string, brg float64, band string, at float64) {
 		d = (mid + math.Max(rng, mid)) / 2
 		far = true
 	}
-	// somebody we are looking at anyway?
+
 	for _, t := range b.tracks {
 		if t.NPC || t.Ghost || at-t.Seen > 2 {
 			continue
@@ -974,7 +976,7 @@ func (b *Bot) heardMech(kind string, brg float64, band string, at float64) {
 			continue
 		}
 		if hyp(n.pos[0], n.pos[1], x, y) < 45 || (n.far && far && math.Abs(angDiff(math.Atan2(n.pos[1]-py, n.pos[0]-px), brg)) < 0.25) {
-			continue // the same one again: keep the newer fix
+			continue
 		}
 		keep = append(keep, n)
 	}

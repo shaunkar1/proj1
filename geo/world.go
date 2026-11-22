@@ -99,7 +99,7 @@ func FromBytes(wj, tr []byte) (*World, error) {
 	for i := 0; i < n; i++ {
 		w.H[i] = float32(int16(binary.LittleEndian.Uint16(tr[2*i:]))) * 0.01
 	}
-	// rasterize prisms
+
 	cnt := make([]int32, n+1)
 	type cellIv struct {
 		c  int32
@@ -169,7 +169,7 @@ func FromBytes(wj, tr []byte) (*World, error) {
 		w.iv[w.off[a.c]+fill[a.c]] = a.iv
 		fill[a.c]++
 	}
-	// trees
+
 	nf := len(j.Trees.Fields)
 	idx := map[string]int{}
 	for i, f := range j.Trees.Fields {
@@ -432,7 +432,7 @@ func (w *World) foliageOK(ax, ay, az, bx, by, bz float64) bool {
 	if l < 1e-6 {
 		return true
 	}
-	limit := -math.Log(w.CanopyBlockT) / w.CanopyDensity // metres of crown
+	limit := -math.Log(w.CanopyBlockT) / w.CanopyDensity
 	n := int(l) + 1
 	step := l / float64(n)
 	inv := 1 / float64(n)

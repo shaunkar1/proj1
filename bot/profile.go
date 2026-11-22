@@ -12,7 +12,7 @@ const Profile = "base"
 // free-for-all behaviour is the same under every profile.
 func ApplyProfile(p *Params, name string) {
 	if strings.HasPrefix(name, "mix:") || strings.HasPrefix(name, "mixs:") || strings.HasPrefix(name, "mixl:") {
-		// a different profile per match, chosen when the match starts (see mixPick)
+
 		p.Mix = name
 		if parts := strings.Split(name, "|"); len(parts) > 1 {
 			ApplyProfile(p, parts[1])
@@ -442,7 +442,7 @@ func mixPick(mix string, seed int64, slot int) string {
 	}
 	hs := slot
 	if hd[0] == "mixs" {
-		hs = 0 // groups by the seed alone
+		hs = 0
 	}
 	x := uint64(seed)*0x9E3779B97F4A7C15 + uint64(hs)*0xBF58476D1CE4E5B9
 	x ^= x >> 30
@@ -452,7 +452,7 @@ func mixPick(mix string, seed int64, slot int) string {
 	x ^= x >> 31
 	g := int(x % uint64(m))
 	if hd[0] == "mixl" {
-		g = ((slot % m) + m) % m // groups by the slot alone
+		g = ((slot % m) + m) % m
 	}
 	c := hd[2][g]
 	k := int(c - '0')

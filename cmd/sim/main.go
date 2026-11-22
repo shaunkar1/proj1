@@ -234,7 +234,7 @@ func main() {
 					}
 					v := cands[(slot+int(sd))%len(cands)]
 					if *shuffle {
-						// a different seating every match, so no candidate keeps the same neighbours
+
 						idx := make([]int, len(cands))
 						for i := range idx {
 							idx[i] = i

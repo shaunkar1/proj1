@@ -61,7 +61,7 @@ func (b *Bot) scorePredictors(t *Track) {
 	if g, _ := b.weapon("gun"); g != nil {
 		speed = g.Stats.Speed
 	}
-	h := int(math.Round(d/speed/0.1 + 0.5)) // flight time in samples
+	h := int(math.Round(d/speed/0.1 + 0.5))
 	if h < 1 {
 		h = 1
 	}
@@ -119,7 +119,7 @@ func (b *Bot) predict(t *Track, dt float64) [3]float64 {
 	y := c[1] + vy*dt*ls
 	z := c[2]
 	if math.Abs(t.Vel[2]) > 0.5 {
-		// airborne: ballistic, but never below the ground
+
 		z += t.Vel[2]*dt - 0.5*b.cfg.Mech.Gravity*dt*dt
 		g := b.w.Ground(x, y) + (c[2] - t.Pos[2])
 		if z < g {
@@ -182,7 +182,7 @@ func (b *Bot) mortarSolve(t *Track, st *proto.WeaponStats) (yaw, pitch, tof floa
 	if pitch < b.me.Stats.MinPitch || pitch > b.me.Stats.MaxPitch {
 		return yaw, pitch, tof, false
 	}
-	// check the arc is clear (sampled)
+
 	vx, vy, vz := math.Cos(th)*math.Cos(yaw)*st.Speed, math.Cos(th)*math.Sin(yaw)*st.Speed, math.Sin(th)*st.Speed
 	n := 8
 	for i := 1; i < n; i++ {
@@ -221,7 +221,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	tolY := math.Atan2(rad*0.85, d)
 	tolP := math.Atan2(hgt*0.42, d)
 	if t.aimOff != ([3]float64{}) {
-		// only part of it shows: aim tighter
+
 		tolY = math.Atan2(rad*0.22, d)
 		tolP = math.Atan2(hgt*0.12, d)
 	}
@@ -234,7 +234,6 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	mor, mi := b.weapon("mortar")
 	ltn, ni := b.weapon("lightning")
 
-	// gun solution (also the default aim)
 	if gun != nil {
 		y, p, _, pt := b.gunSolve(t, gun.Stats.Speed)
 		if d < gun.Stats.Range+10 {
@@ -247,7 +246,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 				act.Fire[gi] = true
 				shot = true
 				if gun.Cooldown <= 0.1 {
-					t.shots += 0.1 / gun.Stats.Cooldown // expected rounds this decision
+					t.shots += 0.1 / gun.Stats.Cooldown
 				}
 			}
 			if clear {
@@ -259,7 +258,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 		y, p, _ := b.aimAt(b.predict(t, latency))
 		cmd = [2]float64{y, p}
 	}
-	// mortar: when ready and a firing solution exists
+
 	if mor != nil && !t.NPC && mor.Cooldown <= 0.11 {
 		splash := mor.Stats.SplashRadius
 		hd := hyp(me.Pos[0], me.Pos[1], t.Pos[0], t.Pos[1])
@@ -275,7 +274,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 			shot = true
 		}
 	}
-	// laser: charge when a shot is likely, release on target
+
 	if las != nil {
 		full := las.Stats.Charge
 		charging := las.Charge > 0
@@ -295,7 +294,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 					lp2 = math.Atan2(hgt*0.1, d)
 				}
 				if lok && ey < tolY*0.8 && ep < lp2 {
-					act.Fire[li] = false // release: fires
+					act.Fire[li] = false
 				}
 				shot = true
 			}
@@ -306,7 +305,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 			act.Fire[li] = true
 		}
 	}
-	// lightning: instant, auto-targets the nearest thing in the cone
+
 	if ltn != nil && ltn.Cooldown <= 0.11 && me.Energy >= ltn.Stats.Energy {
 		hd := dist3(b.muz, c)
 		cone := ltn.Stats.ConeDeg * math.Pi / 180
@@ -339,8 +338,8 @@ func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 	if ltn, ni := b.weapon("lightning"); ltn != nil && d < ltn.Stats.Range-1 && b.me.Energy > 0.7*b.me.MaxEnergy && ey < 0.3 {
 		act.Fire[ni] = true
 	}
-	// a full laser charge opens a crate in one shot: use it when nobody is about
-	tooClose := -pi > -b.me.Stats.MinPitch*0.95 // cannot depress onto it from here: do not sit on a charge
+
+	tooClose := -pi > -b.me.Stats.MinPitch*0.95
 	if las, li := b.weapon("laser"); las != nil && b.lasFree && d < las.Stats.Range-5 && it.HP > 100 && (!tooClose || las.Charge > 0) {
 		full := las.Stats.Charge
 		if las.Charge > 0 {

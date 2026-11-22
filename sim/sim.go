@@ -390,7 +390,7 @@ func New(w *geo.World, base *proto.Hello, seed int64, mk func(slot int, hello *p
 		s.Mechs = append(s.Mechs, m)
 	}
 	s.Alive = n
-	// loot
+
 	kinds := []string{}
 	for k, wt := range s.Cfg.Loot.Weights {
 		if wt > 0 {
@@ -486,7 +486,7 @@ func (s *Sim) advanceZone() {
 	}
 	s.zstart = base + p.HoldS
 	s.zend = s.zstart + p.ShrinkS
-	// next circle inside the current one, on reasonably open ground
+
 	for tries := 0; ; tries++ {
 		a := s.Rng.Float64() * 2 * math.Pi
 		d := (s.zr - p.Radius) * math.Sqrt(s.Rng.Float64())

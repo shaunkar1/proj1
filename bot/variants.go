@@ -10,7 +10,7 @@ func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
 	if strings.HasPrefix(name, "tk") {
-		// short names for practice-profile tickets, for job files
+
 		m := map[string]string{"tk0": "", "tko": "+o", "tko1": "+o1", "tko2": "+o2", "tko4": "+o4", "tko5": "+o5", "tko6": "+o6", "tko7": "+o7", "tko8": "+o8", "tko9": "+o9", "tko10": "+o10", "tko11": "+o11", "tko12": "+o12", "tko13": "+o13", "tko14": "+o14", "tko15": "+o15"}
 		if suf, ok := m[name]; ok {
 			p = baseParams()
@@ -20,7 +20,7 @@ func Variant(name string) Params {
 		}
 	}
 	if strings.HasPrefix(name, "P_") || strings.HasPrefix(name, "Q_") {
-		// practice-profile sweeps: P_ = the d100 ticket base, Q_ = without the supply-drop rush; _ separates modifiers
+
 		base := "f75a220+g+s+d100"
 		if name[0] == 'Q' {
 			base = "f75a220+g+s"
@@ -94,7 +94,7 @@ func Variant(name string) Params {
 		p.DropGunForLtn = true
 		p.WeaponRank = map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5}
 	case "atlike":
-		// stand-in for the laser+lightning chasers seen in showdowns
+
 		p.Aggressive = true
 		p.DropGunForLtn = true
 		p.HuntAfter = 0
@@ -189,7 +189,7 @@ func Variant(name string) Params {
 		p.SiteFarVal = 0
 		p.BossRatio = 0.85
 	case "b7":
-		// previous defaults
+
 		p.HardRatio = 0
 		p.BossRatio = 2.0
 		p.BossObjD, p.BossAvoidD, p.BossSeenD = 160, 150, 1e9
@@ -376,6 +376,42 @@ func Variant(name string) Params {
 		p.HurtHP = 0.9
 		p.HitMem = 60
 		p.LtnObjD = 50
+	case "ls6a":
+		p.FFA0 = "always"
+		p.LateStrike = 6
+		p.LateStrikeHP = 0.65
+		p.LateApproach = 2.5
+	case "pf45":
+		p.FFA0 = "always"
+		p.PatientFinish = 0.45
+	case "qa3c":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+	case "ka2":
+		p.FFA0 = "always"
+		p.KeepAwayAlive = 2
+	case "qa3ka2":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.KeepAwayAlive = 2
+	case "deep":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.KeepAwayAlive = 2
+		p.LateStrike = 6
+		p.LateStrikeHP = 0.65
+		p.LateApproach = 2.5
+		p.PatientFinish = 0.45
+	case "ka2ls":
+		p.FFA0 = "always"
+		p.KeepAwayAlive = 2
+		p.LateStrike = 6
+		p.LateStrikeHP = 0.65
+		p.LateApproach = 2.5
+		p.PatientFinish = 0.45
 	case "ls5":
 		p.FFA0 = "always"
 		p.LateStrike = 5

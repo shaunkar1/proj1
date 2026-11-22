@@ -104,9 +104,9 @@ func (b *Bot) tidySites() {
 		}
 		gz := b.w.Ground(s.pos[0], s.pos[1])
 		if d < 14 || (d < 45 && b.w.Clear(b.eye[0], b.eye[1], b.eye[2], s.pos[0], s.pos[1], gz+1.0)) {
-			// looked at it: nothing here
+
 			if s.far && s.ext < 1 {
-				// the band only says "beyond 160 m": try further along the same bearing once
+
 				s.ext++
 				dd := hyp(s.org[0], s.org[1], s.pos[0], s.pos[1]) + 130
 				s.pos = [2]float64{s.org[0] + math.Cos(s.brg)*dd, s.org[1] + math.Sin(s.brg)*dd}

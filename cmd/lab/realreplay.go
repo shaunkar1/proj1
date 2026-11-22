@@ -1,11 +1,5 @@
 //go:build ignore
 
-// realreplay feeds our bot the observations it would have had along the path
-// our mech actually took in a recorded real match, and prints what the bot
-// decides at each step. The mech follows the recording (open loop); the gun
-// state follows the replayed bot's own trigger and reload commands.
-//
-//	go run cmd/lab/realreplay.go recordings.json 7295 [variant] [t0] [t1]
 package main
 
 import (
@@ -158,7 +152,7 @@ func main() {
 	prev := map[int][]float64{}
 	var upgrades []string
 	capac := 0
-	// our gun as the replayed bot drives it
+
 	ammo, reload, cool := 12.0, 0.0, 0.0
 	lasCharge, lasCool := 0.0, 0.0
 	var act proto.Action
@@ -180,7 +174,7 @@ func main() {
 		if mm == nil || mm[6] <= 0 {
 			break
 		}
-		// world events
+
 		realFire := ""
 		var sounds []proto.SoundObs
 		hear := func(id int, kind string) {
@@ -285,7 +279,6 @@ func main() {
 		}
 		_ = myCubes
 
-		// observation
 		o := proto.Obs{Type: "obs", Tick: f.T, T: ts, Alive: alive}
 		st := h.Config.Mech
 		sc := 1 + 0.05*mm[9]
@@ -385,7 +378,7 @@ func main() {
 				o.Pickups = append(o.Pickups, proto.PickupObs{ID: id, Kind: p.kind, Pos: proto.Vec3{p.pos[0], p.pos[1], p.pos[2]}})
 			}
 		}
-		// zone
+
 		zs := r.Hdr.Zone
 		o.Zone = proto.ZoneObs{Center: proto.Vec2{f.Z[0], f.Z[1]}, Radius: f.Z[2], NextCenter: proto.Vec2{f.Z[0], f.Z[1]}, NextRadius: f.Z[2]}
 		for k := 1; k < len(zs); k++ {
@@ -406,7 +399,6 @@ func main() {
 
 		act = b.Act(&o)
 
-		// our gun, two ticks per decision
 		fired := ""
 		gi, li := -1, -1
 		for s := 0; s < 2; s++ {

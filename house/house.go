@@ -229,7 +229,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			}
 		}
 	}
-	// zone
+
 	z := o.Zone
 	var goal [2]float64
 	hasGoal := false
@@ -282,13 +282,13 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			}
 			st := b.sk.Strafe * b.sSign
 			mv = [2]float64{ux*rad - uy*st, uy*rad + ux*st}
-			// do not strafe into walls
+
 			if !b.w.Nav.Walkable(px+mv[0]*4, py+mv[1]*4) {
 				mv = [2]float64{ux*rad + uy*st, uy*rad - ux*st}
 				b.sSign = -b.sSign
 			}
 		}
-		// aim
+
 		if o.T >= b.noiT {
 			b.noiT = o.T + 0.35
 			b.noise = [2]float64{b.rng.NormFloat64() * b.sk.AimNoise, b.rng.NormFloat64() * b.sk.AimNoise * 0.6}
@@ -433,7 +433,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 						q := [2]float64{c.Pos[0], c.Pos[1]}
 						obj = &q
 						arrive = 12
-						// shoot it
+
 						if d < 60 {
 							yaw := math.Atan2(c.Pos[1]-py, c.Pos[0]-px)
 							pitch := math.Atan2(c.Pos[2]+1.2-muz[2], d)
@@ -476,7 +476,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 			act.Aim = [2]float64{math.Atan2(mv[1], mv[0]) + math.Sin(o.T*0.9+float64(b.id))*1.2, 0}
 		}
 	}
-	// unstick
+
 	if math.Hypot(mv[0], mv[1]) > 0.3 && hyp(px, py, b.last[0], b.last[1]) < 0.08 {
 		b.stuck += 0.1
 	} else {

@@ -18,7 +18,14 @@ func main() {
 		s := fmt.Sprintf("t=%2.0f (%.0f,%.0f):", p[0], p[1], p[2])
 		for _, l := range las {
 			d := math.Hypot(l[0]-p[1], l[1]-p[2])
-			see := false; for _, up := range []float64{0, 15, 25, 40} { if d < 200 && w.Sees(p[1], p[2], p[3]+8+up, l[0], l[1], l[2]+1.0) { see = true; s += fmt.Sprintf(" up%.0f", up); break } }
+			see := false
+			for _, up := range []float64{0, 15, 25, 40} {
+				if d < 200 && w.Sees(p[1], p[2], p[3]+8+up, l[0], l[1], l[2]+1.0) {
+					see = true
+					s += fmt.Sprintf(" up%.0f", up)
+					break
+				}
+			}
 			if see {
 				s += fmt.Sprintf(" SEE(%.0f,%.0f d%.0f)", l[0], l[1], d)
 			} else if d < 200 {
