@@ -957,7 +957,11 @@ func (b *Bot) decide(act *proto.Action) {
 						nn++
 					}
 				}
-				if nn >= 2 {
+				need := 2
+				if b.P.PracDropCrowdN > 0 {
+					need = b.P.PracDropCrowdN
+				}
+				if nn >= need {
 					continue
 				}
 			}
