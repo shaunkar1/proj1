@@ -507,6 +507,35 @@ func (b *Bot) decide(act *proto.Action) {
 				zoneGoal = b.zoneGoalInside(zEnd, zoneGoal, marginR, in)
 			}
 		}
+		if b.P.ZoneGoalNear && b.ffaSure && !b.practice {
+
+			in := math.Min(3, zEnd.r*0.3)
+			if b.zgnOn && (b.zgnC != zEnd || zEnd.outside(b.zgnG[0], b.zgnG[1]) > -in) {
+				b.zgnOn = false
+			}
+			if !b.zgnOn && b.t >= b.zgnT && b.searchTick != o.Tick-2 {
+				b.zgnT = b.t + 2
+				rc := b.pathCostTo(zoneGoal[0], zoneGoal[1])
+				if rc < 0 || rc > 1.5*needIn+60 {
+					sT, sG, sC := b.zonePathT, b.zonePathG, b.zonePathC
+					b.zoneAltT = 0
+					alt := b.zoneGoalInside(zEnd, zoneGoal, marginR, in)
+					if alt != zoneGoal && b.zonePathG == alt && b.zonePathT == b.t && (rc < 0 || b.zonePathC*1.3+30 < rc) {
+						b.zgnG, b.zgnC, b.zgnOn = alt, zEnd, true
+					} else {
+						b.zonePathT, b.zonePathG, b.zonePathC = sT, sG, sC
+						if rc >= 0 {
+							b.zonePathT, b.zonePathG, b.zonePathC = b.t, zoneGoal, rc
+						}
+					}
+				} else {
+					b.zonePathT, b.zonePathG, b.zonePathC = b.t, zoneGoal, rc
+				}
+			}
+			if b.zgnOn {
+				zoneGoal = b.zgnG
+			}
+		}
 
 		if (b.t-b.zonePathT > 1.5 || hyp(zoneGoal[0], zoneGoal[1], b.zonePathG[0], b.zonePathG[1]) > 25) && b.searchTick != o.Tick-2 {
 			b.zonePathT = b.t
@@ -720,6 +749,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 
 	ctx := &moveCtx{threats: threats, wGoal: b.P.WGoal, arrive: 1.5}
+	b.zrOn = 0
 	mode := "roam"
 	var goal [2]float64
 	hasGoal := false
@@ -900,6 +930,32 @@ func (b *Bot) decide(act *proto.Action) {
 
 			ctx.brave = true
 			b.x10.n[xFace]++
+		}
+		if (b.P.ZoneRun > 0 || b.P.ZoneRunStall > 0) && b.ffaSure && !b.practice {
+
+			if b.t-b.zrUrgT > 1.0 {
+				b.zrAt, b.zrT, b.zrFree = [2]float64{px, py}, b.t, false
+			} else if hyp(px, py, b.zrAt[0], b.zrAt[1]) > 8 {
+				b.zrAt, b.zrT = [2]float64{px, py}, b.t
+			}
+			b.zrUrgT = b.t
+			if b.P.ZoneRunStall > 0 && b.t-b.zrT > b.P.ZoneRunStall {
+				b.zrFree = true
+			}
+			switch {
+			case b.P.ZoneRun > 0 && (!me.InZone || b.zoneAt(b.t+b.P.ZoneRun).outside(px, py) > -2):
+				ctx.threats = nil
+				b.zrOn = 2
+			case b.zrFree:
+				var th2 []threat
+				for i := range ctx.threats {
+					if t := ctx.threats[i].t; t.LOS && b.t-t.Seen < 0.3 {
+						th2 = append(th2, ctx.threats[i])
+					}
+				}
+				ctx.threats = th2
+				b.zrOn = 1
+			}
 		}
 	case zoneQuiet && tgt == nil && nHostile == 0 && !underFire && !b.retreating:
 		mode = "zone"
@@ -1514,6 +1570,21 @@ func (b *Bot) decide(act *proto.Action) {
 		if me.Grounded {
 			act.Jump = true
 		}
+	} else if b.t < b.freeT {
+
+		var on bool
+		if mx, my, boost, on = b.freeFlight(act); on {
+			b.stuckT = 0
+			mode = "free"
+		} else {
+			mx, my, boost = b.steer(ctx)
+		}
+	} else if b.stuckT > 0.5 && b.P.Unwedge && b.ffaSure && !b.practice && b.unwedge(hasGoal, goal) {
+
+		b.stuckT = 0
+		b.pathT = -10
+		mx, my, boost, _ = b.freeFlight(act)
+		mode = "free"
 	} else if b.stuckT > 0.5 {
 
 		if c := b.w.Nav.Cell(px+b.lastMove[0]*3, py+b.lastMove[1]*3); c >= 0 {
@@ -1755,6 +1826,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	b.dbg = mode
 	b.e8Trace()
+	b.trace13(act, mode, goal, hasGoal, zoneGo, zoneUrgent, budget, needIn, tgt)
 	b.x10Trace(zoneUrgent, act, farmShot)
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
