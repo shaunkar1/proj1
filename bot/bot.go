@@ -174,6 +174,12 @@ type Params struct {
 	NoPeek          bool
 	Still           bool
 	NoFire          bool
+	FFADropFree     float64
+	FFADropFreeD    float64
+	RoofLoot        bool
+	RoofLootClear   float64
+	QuietScout      float64
+	QuietScoutClear float64
 }
 
 func DefaultParams() Params {
@@ -404,6 +410,7 @@ type Bot struct {
 	climbT        float64
 	climbPos      [3]float64
 	climbFrom     [2]float64
+	climbCube     bool
 	spawnYaw      float64
 	zonePathT     float64
 	zonePathG     [2]float64
@@ -653,6 +660,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 	}
 	for id, it := range b.cubes {
 		if !seenQ[id] && (hyp(it.Pos[0], it.Pos[1], me.Pos[0], me.Pos[1]) < near || o.T-it.Seen > 40) {
+			if b.P.RoofLoot && b.ffaSure && !b.practice && it.Roof && o.T-it.Seen < 120 && !b.w.Clear(b.eye[0], b.eye[1], b.eye[2], it.Pos[0], it.Pos[1], it.Pos[2]+0.5) {
+				continue
+			}
 			delete(b.cubes, id)
 		}
 	}

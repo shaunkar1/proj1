@@ -629,12 +629,20 @@ func (b *Bot) decide(act *proto.Action) {
 
 	var dropGo *proto.DropObs
 	ffaDrop := b.P.FFADrop > 0 && b.ffaSure && !b.practice && hpFrac < b.P.FFADrop && boss == nil
-	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop) || ffaDrop {
+
+	ffaFree := b.P.FFADropFree > 0 && b.ffaSure && !b.practice && !ffaDrop && boss == nil && tgt == nil && nHostile == 0 && hpFrac > 0.5 && b.t-b.lastDmgT > 6
+	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop) || ffaDrop || ffaFree {
 		bd := b.P.PracDropD
+		if ffaFree {
+			bd = b.P.FFADropFreeD
+		}
 		for i := range o.Drops {
 			d := &o.Drops[i]
 			dist := hyp(px, py, d.Pos[0], d.Pos[1])
 			if dist >= bd || zEnd.outside(d.Pos[0], d.Pos[1]) > -4 {
+				continue
+			}
+			if ffaFree && ((d.Holder != nil && *d.Holder != me.ID) || !b.dropClear(d.Pos[0], d.Pos[1], dist) || b.roughDist(d.Pos[0], d.Pos[1]) >= bd) {
 				continue
 			}
 			if ffaDrop {
@@ -941,6 +949,7 @@ func (b *Bot) decide(act *proto.Action) {
 				need := (ob.item.Pos[2]-me.Pos[2])/8.0*me.Stats.JetDrain + 12
 				if hyp(goal[0], goal[1], px, py) < 2.6 && me.Grounded && me.Energy >= need && b.climbID < 0 {
 					b.climbID = ob.item.ID
+					b.climbCube = b.cubes[ob.item.ID] == ob.item
 					b.climbT = b.t
 					b.climbPos = ob.item.Pos
 					b.climbFrom = [2]float64{px, py}
@@ -1145,6 +1154,9 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	if !climbing && b.climbID >= 0 {
 		it := b.pickups[b.climbID]
+		if it == nil && b.climbCube {
+			it = b.cubes[b.climbID]
+		}
 		onRoof := me.Grounded && math.Abs(me.Pos[2]-b.climbPos[2]) < 1.6
 		switch {
 		case it == nil, b.t-b.climbT > 11, underFire, mode == "fight", mode == "retreat", zoneUrgent,
@@ -1355,7 +1367,7 @@ func (b *Bot) decide(act *proto.Action) {
 			var bc *Item
 			bd := 110.0
 			for _, c := range b.crateL {
-				if c.Roof && c.Pos[2] > me.Pos[2]+3 {
+				if c.Roof && c.Pos[2] > me.Pos[2]+3 && !b.roofLootOK(c, hpFrac) {
 					continue
 				}
 				d := hyp(c.Pos[0], c.Pos[1], px, py)
@@ -1797,6 +1809,14 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 	for _, it := range b.cubeL {
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 || b.t < it.Bad {
+			if b.t >= it.Bad && b.roofLootOK(it, hpFrac) && !enemiesNear {
+
+				if c := b.w.Nav.Nearest(it.Pos[0], it.Pos[1], 30); c >= 0 {
+					if ax, ay := b.w.Nav.Pos(c); hyp(ax, ay, it.Pos[0], it.Pos[1]) <= 22 {
+						consider(objective{kind: "roof", pos: [3]float64{ax, ay, me.Pos[2]}, value: 110 - (it.Pos[2]-me.Pos[2])*2.5 - 25, item: it})
+					}
+				}
+			}
 			continue
 		}
 		v := 110.0
@@ -1911,6 +1931,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			if d.Holder != nil && *d.Holder != me.ID {
 				v = 60
 			}
+			if b.P.FFADropFree > 0 && b.ffaSure && !b.practice && (v < 100 || !b.dropClear(d.Pos[0], d.Pos[1], hyp(px, py, d.Pos[0], d.Pos[1]))) {
+				continue
+			}
 			consider(objective{kind: "drop", pos: d.Pos, value: v})
 		}
 	}
@@ -1922,6 +1945,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				v = 125
 			}
 			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: v})
+		}
+	} else if b.P.QuietScout > 0 && b.ffaSure && !b.practice && b.quiet && b.holds("laser") && hpFrac > 0.8 && !enemiesNear && b.t-b.lastDmgT > 10 && b.nobodyWithin(px, py, b.P.QuietScoutClear, 12) {
+
+		if g, ok := b.unseenGoal(zEnd); ok {
+			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: b.P.QuietScout})
 		}
 	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
@@ -2342,4 +2370,43 @@ func (b *Bot) isPrey(t *Track, d, hpFrac float64) bool {
 		return false
 	}
 	return b.dangerRatio(t) < b.P.PreyRatio
+}
+
+func (b *Bot) nobodyWithin(x, y, r, age float64) bool {
+	for _, t := range b.trackL {
+		if !t.NPC && b.t-t.Seen < age && hyp(x, y, t.Pos[0], t.Pos[1]) < r {
+			return false
+		}
+	}
+	for i := range b.noise {
+		n := &b.noise[i]
+		if b.t-n.t < age && !n.far && hyp(x, y, n.pos[0], n.pos[1]) < r {
+			return false
+		}
+	}
+	return true
+}
+
+func (b *Bot) dropClear(x, y, myD float64) bool {
+	if !b.nobodyWithin(x, y, b.P.FFADropFree, 12) {
+		return false
+	}
+	for _, t := range b.trackL {
+		if !t.NPC && b.t-t.Seen < 12 && hyp(x, y, t.Pos[0], t.Pos[1]) < myD+20 {
+			return false
+		}
+	}
+	return true
+}
+
+func (b *Bot) roofLootOK(it *Item, hpFrac float64) bool {
+	if !b.P.RoofLoot || !b.ffaSure || b.practice || !b.P.Roof || !it.Roof {
+		return false
+	}
+	me := b.me
+	h := it.Pos[2] - me.Pos[2]
+	if h < 3 || h/8.0*me.Stats.JetDrain+12 > me.MaxEnergy*0.9 || hpFrac < 0.6 || b.t-b.lastDmgT < 5 {
+		return false
+	}
+	return b.nobodyWithin(me.Pos[0], me.Pos[1], b.P.RoofLootClear, 8)
 }
