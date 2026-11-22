@@ -646,6 +646,17 @@ func Variant(name string) Params {
 			p.HideCover = 120
 			p.QuietWalk, p.QuietWalkT, p.QuietWalkZone, p.QuietWalkQ = 4.6, 30, true, true
 		}
+	case "cb6", "cb7", "cb8":
+		p.FFA0 = "always"
+		p.Open, p.HuntPassive = false, false
+		p.EndPounce, p.EndRushD, p.EndPounceT = 0.85, 110, 12
+		p.EndRefuse = 1.25
+		switch name {
+		case "cb7":
+			p.EndThird = 100
+		case "cb8":
+			p.HideStick, p.HideStill, p.HideCover = 40, true, 120
+		}
 	case "hs40":
 
 		p.FFA0 = "always"
@@ -794,7 +805,7 @@ func Variant(name string) Params {
 		p.ZoneGoalIn = false
 		p.HushT = 0
 		p.FleeD = 0
-	case "e8p", "e8p1", "e8ps", "e8pt", "e8pst", "e8pr", "e8d", "e8all", "e8s", "e8t", "e8r", "e8psr", "e8pd":
+	case "e8p", "e8p1", "e8ps", "e8pt", "e8pst", "e8pr", "e8d", "e8all", "e8s", "e8t", "e8r", "e8psr", "e8pd", "e8prt":
 
 		p.FFA0 = "always"
 		has := func(c string) bool { return name == "e8all" || strings.Contains(name[2:], c) }
