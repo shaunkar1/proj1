@@ -692,9 +692,17 @@ func Variant(name string) Params {
 	case "b1":
 		p.FFA0 = "always"
 		p.EndLow = 6
+		p.ZoneGoalIn = false
+	case "nozg":
+		p.FFA0 = "always"
+		p.ZoneGoalIn = false
+	case "sm35":
+		p.FFA0 = "always"
+		p.ShyMem = 35
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
+		p.ZoneGoalIn = false
 		p.HushT = 0
 		p.FleeD = 0
 	case "zg":
