@@ -600,6 +600,18 @@ func Variant(name string) Params {
 		p.Open = false
 		p.HuntPassive = false
 		p.Camp, p.CampDuty, p.CampD = true, 0.5, 40
+	case "sh25":
+		p.FFA0 = "always"
+		p.ShyHold = 25
+	case "early3":
+		p.FFA0 = "always"
+		p.ShyHold = 25
+		p.HushT = 45
+		p.FleeD = 130
+	case "early2":
+		p.FFA0 = "always"
+		p.ShyHold = 25
+		p.HushT = 45
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0

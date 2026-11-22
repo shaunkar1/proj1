@@ -120,6 +120,7 @@ type Params struct {
 	LateApproachR   float64
 	LateApproach    float64
 	PatientFinish   float64
+	ShyHold         float64
 	LateStrike      int
 	LateStrikeD     float64
 	LateStrikeHP    float64

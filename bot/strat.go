@@ -2052,6 +2052,7 @@ func (b *Bot) shySpot() [2]float64 {
 		return b.shyGoal
 	}
 	b.shyT = b.t + 2.5
+	prev, hadPrev := b.shyGoal, b.shyGoal != [2]float64{}
 	var oth [][2]float64
 	for _, t := range b.trackL {
 		if !t.NPC && !t.Ghost && b.t-t.Seen < 12 {
@@ -2109,6 +2110,14 @@ func (b *Bot) shySpot() [2]float64 {
 			}
 			if sc > bs {
 				bs, b.shyGoal = sc, [2]float64{x, y}
+			}
+		}
+	}
+	if b.P.ShyHold > 0 && b.ffaSure && !b.practice && hadPrev && in <= 0 {
+
+		if dp := hyp(px, py, prev[0], prev[1]); dp > 8 && dp < 140 && nv.WalkableMain(prev[0], prev[1]) && zs.outside(prev[0], prev[1]) <= -12 {
+			if bs < score(prev[0], prev[1])+b.P.ShyHold {
+				b.shyGoal = prev
 			}
 		}
 	}
