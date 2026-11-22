@@ -542,6 +542,15 @@ func (b *Bot) decide(act *proto.Action) {
 		zoneGo = true
 	}
 	zoneUrgent := zoneGo && (zoneLate || b.zoneAt(b.t+6).outside(px, py) > -3)
+	if b.P.ZoneCommit > 0 && b.x10On() {
+
+		if zoneUrgent {
+			b.x10.urgT = b.t
+		} else if zoneGo && b.x10.urgT > 0 && b.t-b.x10.urgT < b.P.ZoneCommit {
+			zoneUrgent = true
+			b.x10.n[xDither]++
+		}
+	}
 	zoneQuiet := false
 	if b.P.QuietWalk > 0 && b.P.QuietWalkZone && b.ffaSure && !b.practice && zoneGo && !zoneUrgent && b.t > b.P.QuietWalkT {
 
@@ -686,6 +695,29 @@ func (b *Bot) decide(act *proto.Action) {
 	if tgt != nil && !engage && !finishing && (incoming > 0 || b.t-b.lastDmgT < 3) {
 
 	}
+	stand := false
+	if b.practice && b.P.PracStand > 0 {
+
+		fleeing := b.retreating || (tgt != nil && !engage && (b.t-b.lastDmgT < 2.5 || incoming > 0))
+		if !fleeing {
+			b.standT, b.standOn = 0, false
+		} else {
+			if b.standT == 0 {
+				b.standT = b.t
+			}
+			if hpFrac < b.P.PracStand && b.t-b.standT > 1.0 && b.t-b.lastDmgT < 0.6 {
+				b.standOn = true
+			}
+		}
+		if b.standOn && b.t-b.lastDmgT < 2.5 {
+			if st := b.standTarget(mechs); st != nil {
+				tgt, stand, engage = st, true, true
+				b.targetID = st.ID
+				st.Hostile = math.Max(st.Hostile, b.t+4)
+				prefD, adv = b.bestRange(st)
+			}
+		}
+	}
 
 	ctx := &moveCtx{threats: threats, wGoal: b.P.WGoal, arrive: 1.5}
 	mode := "roam"
@@ -733,7 +765,7 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 			gd, grab = d, it
 		}
-		if grab == nil && b.P.GrabCube > 0 {
+		if grab == nil && b.P.GrabCube > 0 && !b.cubeFull() {
 
 			gd = b.P.GrabCube
 			for _, it := range b.cubeL {
@@ -771,7 +803,8 @@ func (b *Bot) decide(act *proto.Action) {
 	if e8Drop {
 		ffaFree = true
 	}
-	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop) || ffaDrop || ffaFree {
+	dropWise := b.practice && b.P.PracDropWise > 0
+	if (b.P.PracDrop > 0 && b.practice && hpFrac < b.P.PracDrop && b.dropWanted(hpFrac)) || ffaDrop || ffaFree {
 		bd := b.P.PracDropD
 		if ffaFree {
 			bd = b.P.FFADropFreeD
@@ -822,6 +855,15 @@ func (b *Bot) decide(act *proto.Action) {
 			if dist/me.Stats.WalkSpeed+3 < d.LandsIn {
 				continue
 			}
+			if dropWise {
+
+				if dist/me.Stats.WalkSpeed+1.5 < d.LandsIn {
+					continue
+				}
+				if (b.t-b.lastDmgT < 2.5 || nHostile > 0) && dist > 60 {
+					continue
+				}
+			}
 			bd, dropGo = dist, d
 		}
 	}
@@ -854,6 +896,11 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.target = tgt
 			ctx.strafe = false
 		}
+		if b.P.ZoneBrave > 0 && b.x10On() && (!me.InZone || b.zoneAt(b.t+b.P.ZoneBrave).outside(px, py) > -3) {
+
+			ctx.brave = true
+			b.x10.n[xFace]++
+		}
 	case zoneQuiet && tgt == nil && nHostile == 0 && !underFire && !b.retreating:
 		mode = "zone"
 		goal, hasGoal = zoneGoal, true
@@ -867,6 +914,13 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.mustMove = hyp(px, py, dropGo.Pos[0], dropGo.Pos[1]) > 4
 		ctx.boost = me.Energy > 8 && hyp(px, py, dropGo.Pos[0], dropGo.Pos[1]) > 12
 		ctx.target = tgt
+		if dropWise && tgt != nil && hyp(px, py, dropGo.Pos[0], dropGo.Pos[1]) < dropGo.Radius-1 {
+
+			ctx.arrive = math.Max(2, dropGo.Radius-4)
+			ctx.wGoal = 60
+			ctx.mustMove = false
+			ctx.strafe = true
+		}
 	case grab != nil:
 		mode = "grab"
 		goal, hasGoal = [2]float64{grab.Pos[0], grab.Pos[1]}, true
@@ -922,11 +976,11 @@ func (b *Bot) decide(act *proto.Action) {
 			ctx.mustMove = true
 			ctx.boost = me.Energy > 6
 		}
-	case b.retreating || (tgt != nil && !engage && (underFire || incoming > 0)):
+	case !stand && (b.retreating || (tgt != nil && !engage && (underFire || incoming > 0))):
 		mode = "retreat"
 		sp := b.findSafe(threats)
 		goal, hasGoal = sp, true
-		if !underFire && incoming == 0 && !b.P.NoRetreatCubes {
+		if !underFire && incoming == 0 && !b.P.NoRetreatCubes && !b.cubeFull() {
 
 			bd := 28.0
 			for _, it := range b.cubeL {
@@ -1701,7 +1755,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	b.dbg = mode
 	b.e8Trace()
-	b.x10Trace(zoneUrgent, act)
+	b.x10Trace(zoneUrgent, act, farmShot)
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
 	}
@@ -1756,6 +1810,12 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 	}
 	if b.practice && b.P.PracBerserk {
 		return true
+	}
+	if b.practice && b.P.PracStand > 0 && t.LOS && b.t-t.Seen < 0.3 {
+
+		if md := b.myDps(t, d); md > 0 && t.HP < 2*md {
+			return true
+		}
 	}
 	if b.practice && b.P.PracAggro && hpFrac > b.P.PracAggroHP && d < b.P.PracAggroD {
 		return true
@@ -2010,6 +2070,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			} else if b.laserFree(&ob) {
 				lowFree = true
 				b.x10.n[xLasObj]++
+			} else if b.silentFree(&ob, d) {
+				lowFree = true
+				b.x10.n[xSilObj]++
 			}
 		}
 		if b.endLow && b.P.EndLowD > 0 && !lowFree {
@@ -2140,7 +2203,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			best = &o
 		}
 	}
+	full := b.cubeFull()
 	for _, it := range b.cubeL {
+		if full {
+			break
+		}
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 || b.t < it.Bad {
 			if b.t >= it.Bad && b.roofLootOK(it, hpFrac) && !enemiesNear {
 
@@ -2223,7 +2290,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 		consider(objective{kind: "weapon", pos: it.Pos, value: val, item: it})
 	}
-	if hpFrac > 0.45 {
+	if hpFrac > 0.45 && !(full && b.slot1Rank() != 0) {
 		for _, it := range b.crateL {
 			if (it.Roof && it.Pos[2] > me.Pos[2]+3) || b.t < it.Bad {
 				continue
@@ -2231,7 +2298,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "crate", pos: it.Pos, value: 105, item: it})
 		}
 	}
-	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear {
+	if b.P.FarmNPC && hpFrac > 0.6 && !enemiesNear && !full {
 		for _, t := range b.trackL {
 			if t.NPC && b.t-t.Seen < 3 {
 				consider(objective{kind: "npc", pos: t.Pos, value: b.P.NPCValue, trk: t})
@@ -2252,12 +2319,15 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			}
 		}
 	}
-	if b.P.UseDrops {
+	if b.P.UseDrops && !(full && hpFrac > 0.8) {
 		for i := range b.o.Drops {
 			d := &b.o.Drops[i]
 			dist := b.roughDist(d.Pos[0], d.Pos[1])
 			eta := dist / me.Stats.WalkSpeed
 			if eta > d.LandsIn+25 {
+				continue
+			}
+			if b.practice && b.P.PracDropWise > 0 && (!b.dropWanted(hpFrac) || eta+2 < d.LandsIn) {
 				continue
 			}
 			v := 170.0
@@ -2920,6 +2990,41 @@ func (b *Bot) fleeGoal(from *Track, threats []threat) [2]float64 {
 	}
 	if math.IsInf(bs, -1) {
 		return b.findSafe(threats)
+	}
+	return best
+}
+
+func (b *Bot) cubeFull() bool {
+	return b.practice && b.P.PracCubeMax > 0 && int(b.me.Cubes) >= b.P.PracCubeMax
+}
+
+func (b *Bot) dropWanted(hpFrac float64) bool {
+	if !b.practice || b.P.PracDropWise <= 0 {
+		return true
+	}
+	return hpFrac < b.P.PracDropWise || b.me.Cubes+b.cfg.Drops.Cubes <= b.cfg.Cubes.StatCap
+}
+
+func (b *Bot) standTarget(mechs []*Track) *Track {
+	me := b.me
+	var best *Track
+	bt := math.Inf(1)
+	for _, t := range mechs {
+		if !t.LOS || b.t-t.Seen > 0.3 {
+			continue
+		}
+		d := hyp(me.Pos[0], me.Pos[1], t.Pos[0], t.Pos[1])
+		md := b.myDps(t, d)
+		if md <= 0 {
+			continue
+		}
+		ttk := t.HP / md
+		if b.t-t.HitMe < 3 {
+			ttk *= 0.8
+		}
+		if ttk < bt {
+			bt, best = ttk, t
+		}
 	}
 	return best
 }

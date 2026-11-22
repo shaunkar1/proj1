@@ -28,6 +28,7 @@ type moveCtx struct {
 	arrive   float64
 	mustMove bool
 	keepOff  float64
+	brave    bool
 }
 
 type zoneC struct {
@@ -382,7 +383,7 @@ func (b *Bot) steer(ctx *moveCtx) (mx, my float64, boost bool) {
 		for i := range ctx.threats {
 			th := &ctx.threats[i]
 			d := hyp(x, y, th.t.Pos[0], th.t.Pos[1])
-			if d > 290 {
+			if d > 290 || (c.free && ctx.brave) {
 				continue
 			}
 			exp := b.bodyExposed(th.eye, x, y, gz)
