@@ -866,7 +866,7 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 0.6
 		}
-	case b.fleeFrom(mechs, hpFrac) != nil || b.t < b.fleeUntil:
+	case b.fleeFrom(mechs, hpFrac) != nil || (b.t < b.fleeUntil && b.ffaSure && !b.practice && b.P.FleeD > 0):
 
 		from := b.fleeFrom(mechs, hpFrac)
 		if from == nil {
@@ -1372,6 +1372,8 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	healing := hpFrac < 0.85 && b.t-b.lastDmgT < 40
 	farmShot := false
+
+	silent := (b.endLow && !b.P.EndLowFarm) || b.hush
 	if !shot && shootT == nil && healing {
 
 		for _, t := range b.trackL {
@@ -1382,7 +1384,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 
 		if !shot && !b.P.OldReload {
-			if farm != nil {
+			if farm != nil && !silent {
 				shot = b.shootCrate(act, farm)
 			}
 			if !shot && !b.retreating && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
@@ -1405,7 +1407,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 	} else if !shot && shootT == nil {
 
-		if farmNPC != nil && farmNPC.LOS {
+		if farmNPC != nil && farmNPC.LOS && !(silent && b.t-farmNPC.HitMe >= 3) {
 			shot = b.shootMech(act, farmNPC)
 		}
 		if !shot {
@@ -1417,7 +1419,7 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 		look := b.P.ScanFirst && b.t < 1.7 && (b.ffaSure || b.P.ScanAlways)
-		if !shot && farm != nil && !look {
+		if !shot && farm != nil && !look && !silent {
 			shot = b.shootCrate(act, farm)
 		}
 		if !shot && !b.retreating && !look && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
