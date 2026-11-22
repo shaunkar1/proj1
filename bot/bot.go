@@ -133,6 +133,9 @@ type Params struct {
 	EndLowZoneR     float64
 	EndLowD         float64
 	EndLowFarm      bool
+	ZoneGoalIn      bool
+	ZoneStall       float64
+	ZoneStallE      float64
 	HushT           float64
 	HushD           float64
 	HushLaser       bool
@@ -449,6 +452,19 @@ type Bot struct {
 	zonePathT     float64
 	zonePathG     [2]float64
 	zonePathC     float64
+	zoneAltG      [2]float64
+	zoneAltT      float64
+	zoneAltC      zoneC
+	zoneAltBad    [][3]float64
+	zsBest        float64
+	zsBestC       float64
+	zsT           float64
+	zsUrgT        float64
+	zsN           int
+	boltT         float64
+	boltDir       [2]float64
+	boltZ         float64
+	zsCirc        zoneC
 	dbg           string
 }
 
