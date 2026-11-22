@@ -504,6 +504,9 @@ func Variant(name string) Params {
 	case "ls3":
 		p.FFA0 = "always"
 		p.LateStrike = 3
+	case "noel":
+		p.FFA0 = "always"
+		p.EndLow = 0
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
