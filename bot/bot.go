@@ -110,6 +110,7 @@ type Params struct {
 	HurtHP          float64
 	HitMem          float64
 	LtnObjD         float64
+	LateApproachR   float64
 	LateApproach    float64
 	PatientFinish   float64
 	LateStrike      int
