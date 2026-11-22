@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"mechbot/geo"
+	"mechbot/proto"
 )
 
 type threat struct {
@@ -105,8 +106,14 @@ func (b *Bot) navExtra() func(int) float32 {
 	r2 := (z.r - 3) * (z.r - 3)
 	nb := len(b.blockedC)
 	oc := float32(b.P.OpenCost)
+	nh := len(b.hardC)
 	return func(c int) float32 {
 		var e float32
+		if nh > 0 {
+			if until, bad := b.hardC[c]; bad && b.t < until {
+				e += 500
+			}
+		}
 		if nb > 0 {
 			if _, bad := b.blockedC[c]; bad {
 				e += 30
@@ -680,3 +687,104 @@ func boolf(v bool) float64 {
 }
 
 var _ = geo.NavStep
+
+func (b *Bot) bodyHeld(x, y, z float64) bool {
+	r, h := b.me.Stats.Radius, b.me.Stats.Height
+	if b.w.BodyBlocked(x, y, z+1.2, z+h) {
+		return true
+	}
+	for k := 0; k < 8; k++ {
+		a := float64(k) * math.Pi / 4
+		if b.w.BodyBlocked(x+r*math.Cos(a), y+r*math.Sin(a), z+1.2, z+h) {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Bot) unwedge(hasGoal bool, goal [2]float64) bool {
+	me := b.me
+	px, py, pz := me.Pos[0], me.Pos[1], me.Pos[2]
+	if b.t-b.uwT > 10 || hyp(px, py, b.uwAt[0], b.uwAt[1]) > 4 {
+		b.uwAt, b.uwN = [2]float64{px, py}, 0
+	}
+	b.uwT = b.t
+	b.uwN++
+	if b.uwN < 3 {
+		return false
+	}
+	b.uwN = 0
+	nv := b.w.Nav
+	if !b.bodyHeld(px, py, pz) {
+
+		if b.hardC == nil {
+			b.hardC = map[int]float64{}
+		}
+		ax, ay := px+b.lastMove[0]*4, py+b.lastMove[1]*4
+		for dx := -6.0; dx <= 6; dx += 2 {
+			for dy := -6.0; dy <= 6; dy += 2 {
+				if c := nv.Cell(ax+dx, ay+dy); c >= 0 && dx*dx+dy*dy <= 36 && hyp(ax+dx, ay+dy, px, py) > 2.5 {
+					b.hardC[c] = b.t + 40
+				}
+			}
+		}
+		b.pathT = -10
+	}
+	best, bs := [2]float64{}, math.Inf(1)
+	for r := 4.0; r <= 18 && math.IsInf(bs, 1); r += 2 {
+		for k := 0; k < 16; k++ {
+			a := float64(k) * math.Pi / 8
+			x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+			if !nv.WalkableMain(x, y) || b.bodyHeld(x, y, b.w.Ground(x, y)) {
+				continue
+			}
+			if c := nv.Cell(x, y); c >= 0 && b.t < b.hardC[c] {
+				continue
+			}
+			sc := r
+			if hasGoal {
+				sc += 0.1 * hyp(x, y, goal[0], goal[1])
+			}
+			if sc < bs {
+				bs, best = sc, [2]float64{x, y}
+			}
+		}
+	}
+	if math.IsInf(bs, 1) || me.Energy < 25 {
+		return false
+	}
+	b.freeG, b.freeFrom, b.freeT = best, [2]float64{px, py}, b.t+7
+	return true
+}
+
+func (b *Bot) freeFlight(act *proto.Action) (mx, my float64, boost, ok bool) {
+	me := b.me
+	px, py, pz := me.Pos[0], me.Pos[1], me.Pos[2]
+	dx, dy := b.freeG[0]-px, b.freeG[1]-py
+	l := math.Hypot(dx, dy)
+	clearBelow := !b.bodyHeld(px, py, b.w.Ground(px, py))
+	if l < 1.2 || (clearBelow && hyp(px, py, b.freeFrom[0], b.freeFrom[1]) > 2) || (me.Grounded && me.Energy < 4) {
+		b.freeT = 0
+		return 0, 0, false, false
+	}
+
+	need := b.w.Ground(px, py)
+	r := me.Stats.Radius + 0.4
+	for _, f := range [...]float64{0, 2} {
+		cx, cy := px+dx/l*f, py+dy/l*f
+		need = math.Max(need, b.w.TopAt(cx, cy))
+		for k := 0; k < 8; k++ {
+			a := float64(k) * math.Pi / 4
+			need = math.Max(need, b.w.TopAt(cx+r*math.Cos(a), cy+r*math.Sin(a)))
+		}
+	}
+	need += 1.5
+	if me.Grounded {
+		act.Jump = true
+	}
+	boost = pz < need
+	if pz >= need-0.4 || !b.bodyHeld(px, py, pz) {
+		mx, my = dx/l, dy/l
+	}
+	return mx, my, boost, true
+}

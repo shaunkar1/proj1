@@ -681,6 +681,25 @@ func Variant(name string) Params {
 		case "n4noend":
 			p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 		}
+	case "n4zrun", "n4zrunh", "n4zruns", "n4zgn", "n4b13z", "n4unw", "n4b13":
+
+		p.FFA0 = "always"
+		switch name {
+		case "n4zgn":
+			p.ZoneGoalNear = true
+		case "n4b13z":
+			p.ZoneRun, p.ZoneRunStall, p.ZoneGoalNear = 3, 3, true
+		case "n4unw":
+			p.Unwedge = true
+		case "n4b13":
+			p.ZoneRun, p.ZoneRunStall, p.ZoneGoalNear, p.Unwedge = 3, 3, true, true
+		case "n4zrun":
+			p.ZoneRun, p.ZoneRunStall = 3, 3
+		case "n4zrunh":
+			p.ZoneRun = 3
+		case "n4zruns":
+			p.ZoneRunStall = 3
+		}
 	case "hs40":
 
 		p.FFA0 = "always"

@@ -148,6 +148,10 @@ type Params struct {
 	ZoneGoalIn      bool
 	ZoneStall       float64
 	ZoneStallE      float64
+	ZoneGoalNear    bool
+	Unwedge         bool
+	ZoneRun         float64
+	ZoneRunStall    float64
 	HushT           float64
 	HushD           float64
 	HushLaser       bool
@@ -536,7 +540,25 @@ type Bot struct {
 	boltZ         float64
 	zsCirc        zoneC
 	dbg           string
-	x10           x10state
+
+	zgnG     [2]float64
+	zgnC     zoneC
+	zgnOn    bool
+	zgnT     float64
+	zrAt     [2]float64
+	zrT      float64
+	zrUrgT   float64
+	zrFree   bool
+	dbgZ13   [3]float64
+	uwAt     [2]float64
+	uwT      float64
+	uwN      int
+	freeT    float64
+	freeG    [2]float64
+	freeFrom [2]float64
+	hardC    map[int]float64
+	zrOn     int
+	x10      x10state
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
