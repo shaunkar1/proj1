@@ -227,6 +227,19 @@ type Params struct {
 	EndDrop    int
 	EndDropD   float64
 	EndDropR   float64
+
+	CubeCap        int
+	HotR           float64
+	HotT           float64
+	ThreatMem      float64
+	ThreatMemRatio float64
+	HushMem        float64
+	HushLook       bool
+	FarmClear      float64
+	FarmClearT     float64
+	FarmScout      float64
+	PileAge        float64
+	LaserErrand    float64
 }
 
 func DefaultParams() Params {
@@ -507,6 +520,7 @@ type Bot struct {
 	boltZ         float64
 	zsCirc        zoneC
 	dbg           string
+	x10           x10state
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
@@ -828,6 +842,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 		case "kill":
 			b.kills++
 			delete(b.tracks, e.Target)
+			delete(b.x10.mem, e.Target)
 			if b.targetID == e.Target {
 				b.targetID = -1
 			}
@@ -866,6 +881,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 		}
 		if b.e8Any() {
 			b.e8Hear(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
+		}
+		if b.hotOn() && (s.Kind == "gun" || s.Kind == "laser" || s.Kind == "lightning" || s.Kind == "mortar") {
+			b.hotHear(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
 		}
 		if b.P.EarP > 0 && s.Kind == "gun" && s.Dist != "far" {
 			b.earHear(s.Bearing, s.Dist, o.T-s.Age)

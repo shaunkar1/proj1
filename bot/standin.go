@@ -88,3 +88,10 @@ func (b *Bot) earGoal() ([2]float64, bool) {
 	}
 	return b.earPos, true
 }
+
+func unpinB4(p *Params) {
+	d := DefaultParams()
+	p.FFAPassive = d.FFAPassive
+	p.HideStick, p.HideStill, p.HideCover = d.HideStick, d.HideStill, d.HideCover
+	p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = d.EndPounce, d.EndRushD, d.EndPounceT, d.EndRefuse
+}

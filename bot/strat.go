@@ -381,18 +381,23 @@ func (b *Bot) decide(act *proto.Action) {
 		if b.P.HushD >= 1e8 {
 			b.hush = true
 		}
+		seenMem, heardMem := 10.0, 12.0
+		if b.P.HushMem > 0 {
+			seenMem, heardMem = b.P.HushMem, b.P.HushMem
+		}
 		for _, t := range b.trackL {
-			if !b.hush && !t.NPC && !t.Ghost && b.t-t.Seen < 10 && hyp(px, py, t.Pos[0], t.Pos[1]) < b.P.HushD {
+			if !b.hush && !t.NPC && !t.Ghost && b.t-t.Seen < seenMem && hyp(px, py, t.Pos[0], t.Pos[1]) < b.P.HushD {
 				b.hush = true
 			}
 		}
 		for i := range b.noise {
-			if !b.hush && b.t-b.noise[i].t < 12 && hyp(px, py, b.noise[i].pos[0], b.noise[i].pos[1]) < b.P.HushD {
+			if !b.hush && b.t-b.noise[i].t < heardMem && hyp(px, py, b.noise[i].pos[0], b.noise[i].pos[1]) < b.P.HushD {
 				b.hush = true
 			}
 		}
 	}
 	b.e8Update()
+	b.memUpdate()
 	b.boss = nil
 	b.peer = nil
 	bossD := 1e9
@@ -722,6 +727,10 @@ func (b *Bot) decide(act *proto.Action) {
 			if rd := b.roughDist(it.Pos[0], it.Pos[1]); rd > lim*1.4 {
 				continue
 			}
+			if b.capWeapon(it) {
+				b.x10.n[xCapGrab]++
+				continue
+			}
 			gd, grab = d, it
 		}
 		if grab == nil && b.P.GrabCube > 0 {
@@ -742,6 +751,10 @@ func (b *Bot) decide(act *proto.Action) {
 					}
 				}
 				if near || b.roughDist(it.Pos[0], it.Pos[1]) > b.P.GrabCube*1.5 {
+					continue
+				}
+				if b.cubeNo(it) {
+					b.x10.n[xCapGrab]++
 					continue
 				}
 				gd, grab = d, it
@@ -920,7 +933,7 @@ func (b *Bot) decide(act *proto.Action) {
 				if b.t < it.Bad || (it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3) {
 					continue
 				}
-				if d := hyp(px, py, it.Pos[0], it.Pos[1]); d < bd {
+				if d := hyp(px, py, it.Pos[0], it.Pos[1]); d < bd && !b.cubeNo(it) {
 					bd = d
 					goal = [2]float64{it.Pos[0], it.Pos[1]}
 					mode = "rcube"
@@ -1574,7 +1587,15 @@ func (b *Bot) decide(act *proto.Action) {
 	healing := hpFrac < 0.85 && b.t-b.lastDmgT < 40
 	farmShot := false
 
-	silent := (b.endLow && !b.P.EndLowFarm) || b.hush
+	noFarm := b.capNoFarm()
+
+	lowSilent := b.endLow && !b.P.EndLowFarm
+	if lowSilent && b.farmShots() {
+		lowSilent = false
+		b.x10.n[xFarmShot]++
+	}
+	hushLook := b.P.HushLook && b.x10On() && b.t < 1.7
+	silent := lowSilent || b.hush || noFarm || hushLook
 	if !shot && shootT == nil && healing {
 
 		for _, t := range b.trackL {
@@ -1588,7 +1609,7 @@ func (b *Bot) decide(act *proto.Action) {
 			if farm != nil && !silent {
 				shot = b.shootCrate(act, farm)
 			}
-			if !shot && !b.retreating && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
+			if !shot && !b.retreating && !lowSilent && !b.hush && !noFarm {
 				var bc *Item
 				bd := 60.0
 				for _, c := range b.crateL {
@@ -1596,7 +1617,7 @@ func (b *Bot) decide(act *proto.Action) {
 						continue
 					}
 					d := hyp(c.Pos[0], c.Pos[1], px, py)
-					if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad {
+					if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad && !b.farmBlocked(c.Pos[0], c.Pos[1]) {
 						bd, bc = d, c
 					}
 				}
@@ -1613,7 +1634,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		if !shot {
 			for _, t := range b.trackL {
-				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && !(b.endLow && !b.P.EndLowFarm) && !b.hush && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
+				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && !lowSilent && !b.hush && !noFarm && !hushLook && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
 					shot = b.shootMech(act, t)
 					break
 				}
@@ -1623,7 +1644,7 @@ func (b *Bot) decide(act *proto.Action) {
 		if !shot && farm != nil && !look && !silent {
 			shot = b.shootCrate(act, farm)
 		}
-		if !shot && !b.retreating && !look && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
+		if !shot && !b.retreating && !look && !lowSilent && !b.hush && !noFarm {
 
 			var bc *Item
 			bd := 110.0
@@ -1632,7 +1653,7 @@ func (b *Bot) decide(act *proto.Action) {
 					continue
 				}
 				d := hyp(c.Pos[0], c.Pos[1], px, py)
-				if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad {
+				if d < bd && b.t-c.Seen < 0.5 && b.t >= c.Bad && !b.farmBlocked(c.Pos[0], c.Pos[1]) {
 					bd, bc = d, c
 				}
 			}
@@ -1680,6 +1701,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	b.dbg = mode
 	b.e8Trace()
+	b.x10Trace(zoneUrgent, act)
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
 	}
@@ -1922,6 +1944,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() && ob.kind != "ear" {
 			return
 		}
+		if b.x10Skip(&ob, d) {
+			return
+		}
 		for _, t := range keep {
 			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
@@ -1976,7 +2001,18 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 			}
 		}
+		lowFree := false
 		if b.endLow && b.P.EndLowD > 0 {
+
+			if b.farmFree(&ob) {
+				lowFree = true
+				b.x10.n[xFarmObj]++
+			} else if b.laserFree(&ob) {
+				lowFree = true
+				b.x10.n[xLasObj]++
+			}
+		}
+		if b.endLow && b.P.EndLowD > 0 && !lowFree {
 			switch ob.kind {
 			case "cube", "weapon", "roof", "drop":
 				lim := b.P.EndLowD
@@ -2044,6 +2080,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 			}
 			wantLas := (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && d <= b.P.ShyLaserD
+			if !wantLas && b.laserFree(&ob) {
+				wantLas = true
+			}
 			if b.P.ShyWeapon0 && !b.ffaSure && (ob.kind == "weapon" || ob.kind == "roof") {
 				wantLas = true
 			}
@@ -2245,6 +2284,11 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if g, ok := b.unseenGoal(zEnd); ok {
 			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: b.P.QuietScout})
 		}
+	} else if b.P.FarmScout > 0 && b.farmOn() && hpFrac > 0.8 && b.t-b.lastDmgT > 10 {
+
+		if g, ok := b.unseenGoal(zEnd); ok {
+			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: b.P.FarmScout})
+		}
 	}
 	if g, ok := b.earGoal(); ok && hpFrac > 0.6 {
 		consider(objective{kind: "ear", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: 260})
@@ -2365,7 +2409,7 @@ func (b *Bot) shySpot() [2]float64 {
 		}
 	}
 	b.shyGoal = [2]float64{px, py}
-	if len(oth) == 0 {
+	if len(oth) == 0 && !b.x10Any() {
 		return b.shyGoal
 	}
 	score := func(x, y float64) float64 {
@@ -2375,7 +2419,7 @@ func (b *Bot) shySpot() [2]float64 {
 				m = d
 			}
 		}
-		return m
+		return b.x10Spot(x, y, m)
 	}
 	zs := b.zoneAt(b.t + 25)
 	nv := b.w.Nav
