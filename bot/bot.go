@@ -194,6 +194,7 @@ type Params struct {
 	PracOpenCrowdD  float64
 	PracOpenCrowdT  float64
 	PracOpenCrowdA  float64
+	PracDropCrowdN  int
 	PracDropCrowd   float64
 	FFADropWait     float64
 	FFADrop         float64

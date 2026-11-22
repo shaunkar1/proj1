@@ -128,6 +128,10 @@ func ApplyProfile(p *Params, name string) {
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracSqD = v2
 				}
+			case len(m) > 2 && m[:2] == "dn":
+				if v2, err := strconv.Atoi(m[2:]); err == nil {
+					p.PracDropCrowdN = v2
+				}
 			case len(m) > 2 && m[:2] == "dc":
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracDropCrowd = v2
