@@ -267,7 +267,7 @@ func (b *Bot) hideSpot() [2]float64 {
 				}
 			}
 		}
-		return m
+		return b.x10Spot(x, y, m)
 	}
 
 	stick := 12.0

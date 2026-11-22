@@ -8,6 +8,13 @@ import (
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
+	if strings.HasPrefix(name, "n4_") {
+
+		p = Variant(name[3:])
+		p.Name = name
+		unpinB4(&p)
+		return p
+	}
 	if name != "ffa0" && !strings.HasPrefix(name, "n4") {
 		pinB3(&p)
 	}
@@ -844,6 +851,61 @@ func Variant(name string) Params {
 		if has("d") {
 			p.EndDrop, p.EndDropD = 4, 160
 		}
+	case "ha150", "ha200", "hu150":
+
+		p.FFA0 = "always"
+		if name != "ha200" {
+			p.HushD = 150
+		}
+		if name != "hu150" {
+			p.HushMem, p.HushLook = 5, true
+		}
+	case "fc150", "fc150s", "fc150t", "fc150st", "fc150p":
+
+		p.FFA0 = "always"
+		p.FarmClear, p.PileAge = 150, 30
+		p.FarmScout = 70
+		switch name {
+		case "fc150s":
+			p.HotT = 25
+		case "fc150t":
+			p.ThreatMem = 45
+		case "fc150st":
+			p.HotT, p.ThreatMem = 25, 45
+		case "fc150p":
+			p.PileAge = 0
+		}
+	case "lz150":
+
+		p.FFA0 = "always"
+		p.LaserErrand = 150
+	case "abcd", "abcds", "abcdst", "abc":
+
+		p.FFA0 = "always"
+		p.HushD, p.HushMem, p.HushLook = 150, 5, true
+		p.FarmClear, p.PileAge, p.FarmScout = 150, 30, 70
+		p.LaserErrand = 150
+		if name != "abc" {
+			p.CubeCap = 10
+		}
+		if name == "abcds" || name == "abcdst" {
+			p.HotT = 25
+		}
+		if name == "abcdst" {
+			p.ThreatMem = 45
+		}
+	case "cube10", "cube6":
+
+		p.FFA0 = "always"
+		p.CubeCap = map[string]int{"cube10": 10, "cube6": 6}[name]
+	case "snd80", "snd130":
+
+		p.FFA0 = "always"
+		p.HotR = map[string]float64{"snd80": 80, "snd130": 130}[name]
+	case "thr20", "thr45":
+
+		p.FFA0 = "always"
+		p.ThreatMem = map[string]float64{"thr20": 20, "thr45": 45}[name]
 	case "zg":
 
 		p.FFA0 = "always"
