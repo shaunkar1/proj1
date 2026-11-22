@@ -350,6 +350,11 @@ func (b *Bot) decide(act *proto.Action) {
 	} else {
 		b.quiet = false
 	}
+	b.endLow = b.P.EndLow > 0 && b.ffaSure && !b.practice && b.othersDied > 0 && o.Alive <= b.P.EndLow && o.Alive > 2
+	if b.endLow {
+
+		b.quiet = true
+	}
 	b.boss = nil
 	b.peer = nil
 	bossD := 1e9
@@ -1052,6 +1057,7 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 	}
+	b.DbgGoal, b.DbgHasGoal = goal, hasGoal
 	if hasGoal {
 		ctx.goal = &goal
 	}
@@ -1309,7 +1315,7 @@ func (b *Bot) decide(act *proto.Action) {
 			if farm != nil {
 				shot = b.shootCrate(act, farm)
 			}
-			if !shot && !b.retreating {
+			if !shot && !b.retreating && !(b.endLow && !b.P.EndLowFarm) {
 				var bc *Item
 				bd := 60.0
 				for _, c := range b.crateL {
@@ -1334,7 +1340,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		if !shot {
 			for _, t := range b.trackL {
-				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
+				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && !(b.endLow && !b.P.EndLowFarm) && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
 					shot = b.shootMech(act, t)
 					break
 				}
@@ -1344,7 +1350,7 @@ func (b *Bot) decide(act *proto.Action) {
 		if !shot && farm != nil && !look {
 			shot = b.shootCrate(act, farm)
 		}
-		if !shot && !b.retreating && !look {
+		if !shot && !b.retreating && !look && !(b.endLow && !b.P.EndLowFarm) {
 
 			var bc *Item
 			bd := 110.0
@@ -1661,6 +1667,21 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 			}
 			if lanes >= 2 {
+				return
+			}
+		}
+		if b.endLow && b.P.EndLowD > 0 {
+			switch ob.kind {
+			case "cube", "weapon", "roof", "drop":
+				lim := b.P.EndLowD
+				if (ob.kind == "weapon" || ob.kind == "roof") && ob.item != nil && ob.item.Kind == "laser" && !b.holds("laser") && b.P.ShyLaserD > lim {
+					lim = b.P.ShyLaserD
+				}
+				if d > lim {
+					return
+				}
+			default:
+
 				return
 			}
 		}
@@ -2113,7 +2134,12 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		return
 	}
 	b.scanPhase += 0.1
-	off := math.Sin(b.scanPhase*1.1) * 1.9
+	amp := 1.9
+	if b.P.ScanAhead > 0 && b.ffaSure && !b.practice && b.othersDied > 0 && b.o.Alive <= b.P.EndScan && b.o.Alive > 2 && math.Hypot(act.Move[0], act.Move[1]) > 0.3 {
+
+		amp = b.P.ScanAhead
+	}
+	off := math.Sin(b.scanPhase*1.1) * amp
 	act.Aim = [2]float64{angDiff(base+off, 0), 0}
 }
 

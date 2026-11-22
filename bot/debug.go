@@ -39,3 +39,35 @@ func (b *Bot) trace(act interface{}) {
 func (b *Bot) Info() string {
 	return fmt.Sprintf("mode=%s search=%v pathlen=%d tracks=%d proj=%d", b.mode, b.searchTick == b.o.Tick, len(b.path), len(b.tracks)*1000+b.dbgObj%1000, len(b.o.Projectiles))
 }
+
+func (b *Bot) InfoX() string {
+	me := b.me
+	s := fmt.Sprintf("mode=%-8s q=%v pat=%v tgt=%d", b.mode, b.quiet, b.patient, b.targetID)
+	if b.boss != nil {
+		s += fmt.Sprintf(" boss=%d", b.boss.ID)
+	}
+	if b.peer != nil {
+		s += fmt.Sprintf(" peer=%d", b.peer.ID)
+	}
+	if b.DbgHasGoal {
+		s += fmt.Sprintf(" goal=(%.0f,%.0f;%.0fm)", b.DbgGoal[0], b.DbgGoal[1], hyp(me.Pos[0], me.Pos[1], b.DbgGoal[0], b.DbgGoal[1]))
+	}
+	s += " trk["
+	for _, t := range b.trackL {
+		if t.NPC || b.t-t.Seen > 15 {
+			continue
+		}
+		fl := ""
+		if t.LOS {
+			fl += "L"
+		}
+		if b.t < t.Hostile {
+			fl += "H"
+		}
+		if t.Ghost {
+			fl += "G"
+		}
+		s += fmt.Sprintf(" %d:%.0fm:a%.1f:%s:r%.2f", t.ID, hyp(me.Pos[0], me.Pos[1], t.Pos[0], t.Pos[1]), b.t-t.Seen, fl, b.dangerRatio(t))
+	}
+	return s + " ]"
+}

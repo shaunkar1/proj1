@@ -375,6 +375,19 @@ func Variant(name string) Params {
 		p.HurtHP = 0.9
 		p.HitMem = 60
 		p.LtnObjD = 50
+	case "qa3ls5":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.LateStrike = 5
+	case "ls5ka":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.KeepAwayAlive = 2
+	case "ls5pf":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.PatientFinish = 0.45
 	case "ls6b":
 		p.FFA0 = "always"
 		p.LateStrike = 6
@@ -436,6 +449,41 @@ func Variant(name string) Params {
 		p.LateStrikeHP = 0.65
 		p.LateApproach = 2.5
 		p.PatientFinish = 0.45
+	case "el6":
+		p.FFA0 = "always"
+		p.EndLow = 6
+	case "el8":
+		p.FFA0 = "always"
+		p.EndLow = 8
+	case "el6a":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.EndLowD = 0
+		p.EndLowFarm = true
+	case "el6b":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.EndLowD = 0
+	case "el6ls":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.LateStrike = 5
+	case "sah":
+		p.FFA0 = "always"
+		p.ScanAhead = 1.0
+	case "el6sah":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.ScanAhead = 1.0
+	case "el6lssah":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.LateStrike = 5
+		p.ScanAhead = 1.0
+	case "lssah":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.ScanAhead = 1.0
 	case "ls5":
 		p.FFA0 = "always"
 		p.LateStrike = 5
@@ -456,6 +504,9 @@ func Variant(name string) Params {
 	case "ls3":
 		p.FFA0 = "always"
 		p.LateStrike = 3
+	case "noel":
+		p.FFA0 = "always"
+		p.EndLow = 0
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
