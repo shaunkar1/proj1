@@ -308,6 +308,9 @@ func (b *Bot) decide(act *proto.Action) {
 		if age > 12 {
 			continue
 		}
+		if age > 1 {
+			t.closeT = 0
+		}
 		d := hyp(px, py, t.Pos[0], t.Pos[1])
 		w := 0.3
 		bearingToMe := math.Atan2(py-t.Pos[1], px-t.Pos[0])
@@ -327,6 +330,17 @@ func (b *Bot) decide(act *proto.Action) {
 			ghost = t
 		}
 		if age < 0.3 && !t.Ghost {
+			if b.P.FleeD > 0 && d > 1 {
+
+				cv := (t.AvgVel[0]*(px-t.Pos[0]) + t.AvgVel[1]*(py-t.Pos[1])) / d
+				if cv >= b.P.FleeV {
+					if t.closeT == 0 {
+						t.closeT = b.t
+					}
+				} else if cv < b.P.FleeV*0.5 {
+					t.closeT = 0
+				}
+			}
 			mechs = append(mechs, t)
 			if t.LOS && hostile && (facing < 0.6 || b.t-t.HitMe < 3) {
 				incoming += b.enemyDps(t, d)
@@ -354,6 +368,23 @@ func (b *Bot) decide(act *proto.Action) {
 	if b.endLow {
 
 		b.quiet = true
+	}
+	b.hush = false
+	if b.P.HushT > 0 && b.ffaSure && !b.practice && b.t < b.P.HushT && !(b.P.HushLaser && b.holds("laser")) {
+
+		if b.P.HushD >= 1e8 {
+			b.hush = true
+		}
+		for _, t := range b.trackL {
+			if !b.hush && !t.NPC && !t.Ghost && b.t-t.Seen < 10 && hyp(px, py, t.Pos[0], t.Pos[1]) < b.P.HushD {
+				b.hush = true
+			}
+		}
+		for i := range b.noise {
+			if !b.hush && b.t-b.noise[i].t < 12 && hyp(px, py, b.noise[i].pos[0], b.noise[i].pos[1]) < b.P.HushD {
+				b.hush = true
+			}
+		}
 	}
 	b.boss = nil
 	b.peer = nil
@@ -835,6 +866,26 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = zoneGoal, true
 			ctx.wGoal = 0.6
 		}
+	case b.fleeFrom(mechs, hpFrac) != nil || b.t < b.fleeUntil:
+
+		from := b.fleeFrom(mechs, hpFrac)
+		if from == nil {
+			from = b.tracks[b.fleeID]
+		}
+		if from != nil {
+			from.fledT = b.t
+			if b.t >= b.fleeUntil || from.ID != b.fleeID || hyp(px, py, b.fleeG[0], b.fleeG[1]) < 8 {
+				b.fleeG = b.fleeGoal(from, threats)
+				b.fleeUntil = b.t + b.P.FleeHold
+				b.fleeID = from.ID
+			}
+		}
+		mode = "flee"
+		goal, hasGoal = b.fleeG, true
+		ctx.arrive = 5
+		ctx.wGoal = 3
+		ctx.mustMove = hyp(px, py, b.fleeG[0], b.fleeG[1]) > 6
+		ctx.boost = me.Energy > 10 && hyp(px, py, b.fleeG[0], b.fleeG[1]) > 15
 	case b.E.Watchdog && !b.P.NoBreak && b.t < b.breakT && !b.practice:
 		mode = "break"
 		goal, hasGoal = b.breakG, true
@@ -1332,7 +1383,7 @@ func (b *Bot) decide(act *proto.Action) {
 			if farm != nil {
 				shot = b.shootCrate(act, farm)
 			}
-			if !shot && !b.retreating && !(b.endLow && !b.P.EndLowFarm) {
+			if !shot && !b.retreating && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
 				var bc *Item
 				bd := 60.0
 				for _, c := range b.crateL {
@@ -1357,7 +1408,7 @@ func (b *Bot) decide(act *proto.Action) {
 		}
 		if !shot {
 			for _, t := range b.trackL {
-				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && !(b.endLow && !b.P.EndLowFarm) && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
+				if t.NPC && t.LOS && b.t-t.Seen < 0.3 && (b.t-t.HitMe < 3 || (b.P.FarmNPC && !(b.endLow && !b.P.EndLowFarm) && !b.hush && hpFrac > 0.5 && hyp(px, py, t.Pos[0], t.Pos[1]) < 60)) {
 					shot = b.shootMech(act, t)
 					break
 				}
@@ -1367,7 +1418,7 @@ func (b *Bot) decide(act *proto.Action) {
 		if !shot && farm != nil && !look {
 			shot = b.shootCrate(act, farm)
 		}
-		if !shot && !b.retreating && !look && !(b.endLow && !b.P.EndLowFarm) {
+		if !shot && !b.retreating && !look && !(b.endLow && !b.P.EndLowFarm) && !b.hush {
 
 			var bc *Item
 			bd := 110.0
@@ -1688,6 +1739,24 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			}
 			if lanes >= 2 {
 				return
+			}
+		}
+		if b.hush && (ob.kind == "crate" || ob.kind == "npc" || ob.kind == "npcgo") {
+			return
+		}
+		if b.P.FleeD > 0 && b.P.FleeMem > 0 && b.ffaSure && !b.practice && d > 12 {
+			for _, t := range b.trackL {
+				if t.NPC || t.fledT == 0 || b.t-t.fledT > b.P.FleeMem {
+					continue
+				}
+				dt := hyp(px, py, t.Pos[0], t.Pos[1])
+				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+				if db < 220 && db < dt-5 {
+					return
+				}
+				if dt > 1 && d > dt*0.7 && ((ob.pos[0]-px)*(t.Pos[0]-px)+(ob.pos[1]-py)*(t.Pos[1]-py))/(hyp(ob.pos[0], ob.pos[1], px, py)*dt+1e-9) > 0.7 {
+					return
+				}
 			}
 		}
 		if b.endLow && b.P.EndLowD > 0 {
@@ -2417,4 +2486,81 @@ func (b *Bot) roofLootOK(it *Item, hpFrac float64) bool {
 		return false
 	}
 	return b.nobodyWithin(me.Pos[0], me.Pos[1], b.P.RoofLootClear, 8)
+}
+
+func (b *Bot) fleeFrom(mechs []*Track, hpFrac float64) *Track {
+	if b.P.FleeD <= 0 || !b.ffaSure || b.practice || !b.quiet || b.o.Alive <= 2 {
+		return nil
+	}
+	px, py := b.me.Pos[0], b.me.Pos[1]
+	var best *Track
+	bd := 1e9
+	for _, t := range mechs {
+		if t.closeT == 0 || b.t-t.closeT < b.P.FleeT {
+			continue
+		}
+		lim := b.P.FleeD
+		if t.has[2] && t.LOS && b.P.FleeLasD > lim {
+			lim = b.P.FleeLasD
+		}
+		d := hyp(px, py, t.Pos[0], t.Pos[1])
+		if d > lim || d >= bd {
+			continue
+		}
+		if t.HP < 0.3*t.MaxHP || b.dangerRatio(t) < b.P.FleeRatio {
+			continue
+		}
+		best, bd = t, d
+	}
+	return best
+}
+
+func (b *Bot) fleeGoal(from *Track, threats []threat) [2]float64 {
+	me := b.me
+	px, py := me.Pos[0], me.Pos[1]
+	d0 := hyp(px, py, from.Pos[0], from.Pos[1])
+	base := math.Atan2(py-from.Pos[1], px-from.Pos[0])
+	zs := b.zoneAt(b.t + 15)
+	nv := b.w.Nav
+	eye := [3]float64{from.Pos[0], from.Pos[1], from.Pos[2] + 8.0*from.Scale}
+	best, bs := [2]float64{}, math.Inf(-1)
+	for k := -7; k <= 7; k++ {
+		a := base + float64(k)*0.2
+		for _, r := range [...]float64{70, 110, 150} {
+			x, y := px+r*math.Cos(a), py+r*math.Sin(a)
+			if !nv.WalkableMain(x, y) || zs.outside(x, y) > -8 {
+				continue
+			}
+			s := hyp(x, y, from.Pos[0], from.Pos[1]) - d0
+			if !b.bodyExposed(eye, x, y, b.w.Ground(x, y)) {
+				s += 60
+			}
+			if rd := b.roughDist(x, y); rd > r*1.1 {
+				s -= 40
+			}
+			for _, t := range b.trackL {
+				if t == from || t.NPC || b.t-t.Seen > 8 {
+					continue
+				}
+				if dd := hyp(x, y, t.Pos[0], t.Pos[1]); dd < 110 {
+					s -= 110 - dd
+				}
+			}
+			for i := range b.noise {
+				if b.t-b.noise[i].t > 12 {
+					continue
+				}
+				if dd := hyp(x, y, b.noise[i].pos[0], b.noise[i].pos[1]); dd < 110 {
+					s -= (110 - dd) * 0.7
+				}
+			}
+			if s > bs {
+				bs, best = s, [2]float64{x, y}
+			}
+		}
+	}
+	if math.IsInf(bs, -1) {
+		return b.findSafe(threats)
+	}
+	return best
 }

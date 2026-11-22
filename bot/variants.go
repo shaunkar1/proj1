@@ -473,6 +473,38 @@ func Variant(name string) Params {
 		p.LateStrikeHP = 0.65
 		p.LateApproach = 2.5
 		p.PatientFinish = 0.45
+	case "hu45":
+		p.FFA0 = "always"
+		p.HushT = 45
+	case "hu90":
+		p.FFA0 = "always"
+		p.HushT = 90
+	case "hu45w":
+		p.FFA0 = "always"
+		p.HushT, p.HushD = 45, 260
+	case "hu45a":
+		p.FFA0 = "always"
+		p.HushT, p.HushD = 45, 1e9
+	case "hu90l":
+		p.FFA0 = "always"
+		p.HushT, p.HushD, p.HushLaser = 90, 1e9, true
+	case "fl130":
+		p.FFA0 = "always"
+		p.FleeD = 130
+	case "fl130l":
+		p.FFA0 = "always"
+		p.FleeD, p.FleeLasD = 130, 200
+	case "fl100":
+		p.FFA0 = "always"
+		p.FleeD = 100
+	case "hufl":
+		p.FFA0 = "always"
+		p.HushT = 45
+		p.FleeD = 130
+	case "hufll":
+		p.FFA0 = "always"
+		p.HushT = 45
+		p.FleeD, p.FleeLasD = 130, 200
 	case "el6":
 		p.FFA0 = "always"
 		p.EndLow = 6
