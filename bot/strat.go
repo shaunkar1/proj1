@@ -1037,6 +1037,8 @@ func (b *Bot) decide(act *proto.Action) {
 				}
 			case "hunt":
 				ctx.arrive = 30
+			case "ear":
+				ctx.arrive = 25
 			case "drop":
 				ctx.arrive = 2
 			default:
@@ -1702,7 +1704,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
-		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() {
+		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() && ob.kind != "ear" {
 			return
 		}
 		for _, t := range keep {
@@ -2029,6 +2031,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			consider(objective{kind: "explore", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: b.P.QuietScout})
 		}
 	}
+	if g, ok := b.earGoal(); ok && hpFrac > 0.6 {
+		consider(objective{kind: "ear", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: 260})
+	}
 	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
 		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro) && !b.isPrey(t, hyp(px, py, t.Pos[0], t.Pos[1]), hpFrac)) {
@@ -2240,6 +2245,9 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		return
 	case b.t-b.hearT < 1.5:
 		act.Aim = [2]float64{b.hearDir, 0}
+		return
+	case b.P.EarP > 0 && b.earT > 0 && b.t-b.earHeardT < 3:
+		act.Aim = [2]float64{b.earDir, 0}
 		return
 	}
 	if b.P.SpinScan {

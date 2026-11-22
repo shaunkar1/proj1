@@ -8,6 +8,21 @@ import (
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
+	switch name {
+	case "hunterAe", "hunterB2e", "brawle", "hunterAet", "hunterB2et", "brawlet", "campRet", "campR2et":
+
+		base := strings.TrimSuffix(strings.TrimSuffix(name, "t"), "e")
+		p = Variant(base)
+		p.Name = name
+		p.EarP = 0.8
+		if base == "hunterB2" || base == "campR" || base == "campR2" {
+			p.EarP = 0.4
+		}
+		if !strings.HasSuffix(name, "t") {
+			p.EarWalk = 12
+		}
+		return p
+	}
 	if strings.HasPrefix(name, "tk") {
 
 		m := map[string]string{"tk0": "", "tko": "+o", "tko1": "+o1", "tko2": "+o2", "tko4": "+o4", "tko5": "+o5", "tko6": "+o6", "tko7": "+o7", "tko8": "+o8", "tko9": "+o9", "tko10": "+o10", "tko11": "+o11", "tko12": "+o12", "tko13": "+o13", "tko14": "+o14", "tko15": "+o15"}
@@ -985,6 +1000,8 @@ func Variant(name string) Params {
 		p.Open = false
 		p.HuntPassive = false
 		p.EndLow = 0
+		p.HushT = 0
+		p.FleeD = 0
 		p.Camp, p.CampDuty, p.CampD = true, 0.5, 40
 	case "campR", "campR2":
 

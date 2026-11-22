@@ -18,6 +18,9 @@ type Params struct {
 	Camp       bool
 	CampD      float64
 	CampDuty   float64
+	EarP       float64
+	EarWalk    float64
+	EarAfter   float64
 
 	Name            string
 	EngageRatio     float64
@@ -350,6 +353,11 @@ type Bot struct {
 	lasHold       bool
 	cmdAim        [2]float64
 	campHold      bool
+	earT          float64
+	earHeardT     float64
+	earDir        float64
+	earPos        [2]float64
+	earRolls      []noiseSrc
 	kills         int
 	othersDied    int
 	prevAlive     int
@@ -797,6 +805,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 		switch s.Kind {
 		case "gun", "laser", "laser_charge", "lightning", "mortar", "reload", "boost", "jet", "step":
 			b.heardMech(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
+		}
+		if b.P.EarP > 0 && s.Kind == "gun" && s.Dist != "far" {
+			b.earHear(s.Bearing, s.Dist, o.T-s.Age)
 		}
 		if s.Dist == "near" && (s.Kind == "step" || s.Kind == "boost" || s.Kind == "jet" || s.Kind == "reload" || s.Kind == "laser_charge" || s.Kind == "lightning" || s.Kind == "gun") {
 			b.hearT = o.T - s.Age
