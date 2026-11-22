@@ -715,6 +715,10 @@ func Variant(name string) Params {
 			green()
 			corpse()
 		}
+	case "n4hn25", "n4hn50", "n4hn80":
+
+		p.FFA0 = "always"
+		p.HideNext = map[string]float64{"n4hn25": 25, "n4hn50": 50, "n4hn80": 80}[name]
 	case "b4":
 
 		p.FFA0 = "always"

@@ -150,6 +150,7 @@ type Params struct {
 	ZoneStallE      float64
 	ZoneGoalNear    bool
 	Unwedge         bool
+	HideNext        float64
 	ZoneRun         float64
 	ZoneRunStall    float64
 	HushT           float64
