@@ -629,6 +629,23 @@ func Variant(name string) Params {
 		case "qw46n":
 			p.QuietWalkZone = false
 		}
+	case "cb1", "cb2", "cb3", "cb4", "cb5":
+		p.FFA0 = "always"
+		p.Open, p.HuntPassive = false, false
+		p.HideStick, p.HideStill = 40, true
+		switch name {
+		case "cb1":
+			p.HideCover = 120
+		case "cb3":
+			p.HideCover = 120
+			p.QuietWalk, p.QuietWalkT, p.QuietWalkZone = 4.6, 30, true
+		case "cb4":
+			p.HideCover = 120
+			p.FarmNPC = false
+		case "cb5":
+			p.HideCover = 120
+			p.QuietWalk, p.QuietWalkT, p.QuietWalkZone, p.QuietWalkQ = 4.6, 30, true, true
+		}
 	case "hs40":
 
 		p.FFA0 = "always"
