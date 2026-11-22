@@ -612,9 +612,21 @@ func Variant(name string) Params {
 		p.FFA0 = "always"
 		p.ShyHold = 25
 		p.HushT = 45
+	case "nohu":
+		p.FFA0 = "always"
+		p.HushT = 0
+	case "noflee":
+		p.FFA0 = "always"
+		p.FleeD = 0
+	case "v2200":
+		p.FFA0 = "always"
+		p.HushT = 0
+		p.FleeD = 0
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
+		p.HushT = 0
+		p.FleeD = 0
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
