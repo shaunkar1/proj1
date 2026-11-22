@@ -180,6 +180,10 @@ type Params struct {
 	PracCubeMax     int
 	PracDropWise    float64
 	PracStand       float64
+	PracTW          int
+	PracIso         float64
+	PracSqD         float64
+	PracDropCrowd   float64
 	FFADropWait     float64
 	FFADrop         float64
 	RngSalt         int
