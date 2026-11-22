@@ -124,6 +124,13 @@ type Params struct {
 	LateApproach    float64
 	PatientFinish   float64
 	ShyHold         float64
+	HideCover       float64
+	HideGeo         float64
+	HideStick       float64
+	HideStill       bool
+	HideCorner      float64
+	HideCtr         float64
+	HideRoof        float64
 	LateStrike      int
 	LateStrikeD     float64
 	LateStrikeHP    float64
@@ -133,6 +140,10 @@ type Params struct {
 	EndLowZoneR     float64
 	EndLowD         float64
 	EndLowFarm      bool
+	QuietWalk       float64
+	QuietWalkT      float64
+	QuietWalkQ      bool
+	QuietWalkZone   bool
 	ZoneGoalIn      bool
 	ZoneStall       float64
 	ZoneStallE      float64
@@ -205,6 +216,16 @@ type Params struct {
 	RoofLootClear   float64
 	QuietScout      float64
 	QuietScoutClear float64
+
+	EndPounce  float64
+	EndPounceT float64
+	EndRushD   float64
+	EndRefuse  float64
+	EndStalk   float64
+	EndThird   float64
+	EndDrop    int
+	EndDropD   float64
+	EndDropR   float64
 }
 
 func DefaultParams() Params {
@@ -350,6 +371,7 @@ type Bot struct {
 	targetID      int
 	retreating    bool
 	lastDmgT      float64
+	quietWalkN    int
 	lastDmgBy     int
 	lastDmgDir    float64
 	dmgRecent     float64
@@ -393,6 +415,12 @@ type Bot struct {
 	readyGap      float64
 	shyMoveT      float64
 	shyMoveG      [2]float64
+	hideExpo      map[int]float32
+	hideCornerG   [2]float64
+	hideSurvC     [2]float64
+	hideSurvI     int
+	hideCornerT   float64
+	hideN         [4]int
 	safeSpot      [2]float64
 	safeT         float64
 	roamGoal      [2]float64
@@ -434,6 +462,18 @@ type Bot struct {
 	fleeUntil     float64
 	fleeID        int
 	dropSeen      map[int]float64
+	e8T           *Track
+	e8Go          bool
+	e8Site        [2]float64
+	e8SiteT       float64
+	e8Las         *Track
+	e8Snd         []e8snd
+	e8Fight       [2]float64
+	e8FightT      float64
+	e8FightSeen   bool
+	e8FightFar    bool
+	e8Hold        [2]float64
+	e8HoldT       float64
 	dbgObj        int
 	DbgGoal       [2]float64
 	DbgHasGoal    bool
@@ -822,6 +862,9 @@ func (b *Bot) perceive(o *proto.Obs) {
 		switch s.Kind {
 		case "gun", "laser", "laser_charge", "lightning", "mortar", "reload", "boost", "jet", "step":
 			b.heardMech(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
+		}
+		if b.e8Any() {
+			b.e8Hear(s.Kind, s.Bearing, s.Dist, o.T-s.Age)
 		}
 		if b.P.EarP > 0 && s.Kind == "gun" && s.Dist != "far" {
 			b.earHear(s.Bearing, s.Dist, o.T-s.Age)

@@ -231,7 +231,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 			an := b.aimNext(cmd, 1)
 			ey, ep := aimErr(an, y, p)
 			clear := t.LOS && b.w.Clear(b.muz[0], b.muz[1], b.muz[2], pt[0], pt[1], pt[2])
-			if clear && gun.Reload <= 0 && gun.Ammo > 0 && ey < tolY && ep < tolP && d < gun.Stats.Range {
+			if clear && gun.Reload <= 0 && gun.Ammo > 0 && ey < tolY && ep < tolP && d < gun.Stats.Range && b.e8Las != t {
 				act.Fire[gi] = true
 				shot = true
 				if gun.Cooldown <= 0.1 {
@@ -295,7 +295,7 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 		}
 	}
 
-	if ltn != nil && ltn.Cooldown <= 0.11 && me.Energy >= ltn.Stats.Energy {
+	if ltn != nil && ltn.Cooldown <= 0.11 && me.Energy >= ltn.Stats.Energy && b.e8Las != t {
 		hd := dist3(b.muz, c)
 		cone := ltn.Stats.ConeDeg * math.Pi / 180
 		an := b.aimNext(cmd, 1)
