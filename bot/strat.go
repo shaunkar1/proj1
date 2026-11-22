@@ -365,6 +365,9 @@ func (b *Bot) decide(act *proto.Action) {
 		b.quiet = false
 	}
 	b.endLow = b.P.EndLow > 0 && b.ffaSure && !b.practice && b.othersDied > 0 && o.Alive <= b.P.EndLow && o.Alive > 2
+	if b.endLow && b.P.EndLowZoneR > 0 && o.Zone.Radius < b.P.EndLowZoneR {
+		b.endLow = false
+	}
 	if b.endLow {
 
 		b.quiet = true
@@ -478,6 +481,12 @@ func (b *Bot) decide(act *proto.Action) {
 			x, y := b.w.Nav.Pos(c)
 			zoneGoal = [2]float64{x, y}
 		}
+		if b.P.ZoneGoalIn && b.ffaSure && !b.practice {
+
+			if in := math.Min(3, zEnd.r*0.3); zEnd.outside(zoneGoal[0], zoneGoal[1]) > -in {
+				zoneGoal = b.zoneGoalInside(zEnd, zoneGoal, marginR, in)
+			}
+		}
 
 		if (b.t-b.zonePathT > 1.5 || hyp(zoneGoal[0], zoneGoal[1], b.zonePathG[0], b.zonePathG[1]) > 25) && b.searchTick != o.Tick-2 {
 			b.zonePathT = b.t
@@ -485,6 +494,11 @@ func (b *Bot) decide(act *proto.Action) {
 			b.zonePathC = b.pathCostTo(zoneGoal[0], zoneGoal[1])
 			if b.zonePathC < 0 {
 				b.zonePathC = needIn * 2.5
+				if b.P.ZoneGoalIn && b.ffaSure && !b.practice && zoneGoal == b.zoneAltG && b.t < b.zoneAltT {
+
+					b.zoneAltBad = append(b.zoneAltBad, [3]float64{zoneGoal[0], zoneGoal[1], b.t + 12})
+					b.zoneAltT = 0
+				}
 			}
 		}
 		travel := b.zonePathC/me.Stats.WalkSpeed*1.1 + 3
@@ -511,6 +525,50 @@ func (b *Bot) decide(act *proto.Action) {
 	if zoneGo && b.ffaSure && !b.practice && b.P.ZoneLead > 0 && budget < b.P.ZoneLead {
 
 		zoneUrgent = true
+	}
+	zoneBolt, zoneHold := false, false
+	if b.P.ZoneStall > 0 && b.ffaSure && !b.practice {
+
+		if zoneUrgent {
+			if b.t-b.zsUrgT > 1.5 || b.zsBest == 0 || b.zsCirc != zEnd {
+
+				b.zsBest, b.zsBestC, b.zsT, b.zsN, b.zsCirc = needIn, b.zonePathC, b.t, 0, zEnd
+			}
+			b.zsUrgT = b.t
+			if needIn < b.zsBest-2 || b.zonePathC < b.zsBestC-3 {
+				b.zsBest, b.zsBestC, b.zsT, b.zsN = math.Min(needIn, b.zsBest), math.Min(b.zonePathC, b.zsBestC), b.t, 0
+			}
+			if b.t >= b.boltT && b.t-b.zsT > b.P.ZoneStall && dNext > 12 {
+				if me.Energy < b.P.ZoneStallE && b.t-b.zsT < b.P.ZoneStall+2.5 {
+					zoneHold = true
+				} else {
+
+					dx, dy := zEnd.c[0]-px, zEnd.c[1]-py
+					n := b.zsN % 6
+					if n == 0 {
+						if cx, cy, ok := b.navTo(zoneGoal[0], zoneGoal[1]); ok && hyp(cx, cy, px, py) > 2 {
+							dx, dy = cx-px, cy-py
+						}
+					}
+					a := math.Atan2(dy, dx)
+					if n >= 2 {
+						k := float64((n-2)/2 + 1)
+						if n%2 == 1 {
+							k = -k
+						}
+						a += k * math.Pi / 3
+					}
+					b.boltDir = [2]float64{math.Cos(a), math.Sin(a)}
+					b.boltT = b.t + 2.2
+					b.boltZ = me.Pos[2]
+					b.zsT = b.t + 2.2 - b.P.ZoneStall + 1
+					b.zsN++
+				}
+			}
+			zoneBolt = b.t < b.boltT
+		} else {
+			b.boltT = 0
+		}
 	}
 
 	engage := false
@@ -715,6 +773,9 @@ func (b *Bot) decide(act *proto.Action) {
 		mode = "zone"
 		goal, hasGoal = zoneGoal, true
 		ctx.boost = me.Energy > 8
+		if b.P.ZoneStall > 0 && b.P.ZoneStallE > 8 && b.ffaSure && !b.practice {
+			ctx.boost = me.Energy > b.P.ZoneStallE
+		}
 		ctx.wGoal = 4
 		ctx.mustMove = true
 		if tgt != nil {
@@ -1260,7 +1321,21 @@ func (b *Bot) decide(act *proto.Action) {
 		boost = false
 		climbing = true
 	}
-	if climbing {
+	bolt := zoneBolt && !climbing && mode == "zone"
+	if bolt {
+
+		mx, my = b.boltDir[0], b.boltDir[1]
+		boost = me.Energy > 2
+		if b.P.ZoneStallE > 0 {
+			boost = !me.Grounded && me.Pos[2] < b.boltZ+7 && me.Energy > 0
+		}
+		if me.Grounded {
+			act.Jump = true
+		}
+		b.stuckT = 0
+		b.pathT = -10
+		mode = "zbolt"
+	} else if climbing {
 		b.stuckT = 0
 	} else if b.t < b.unstickT {
 		mx, my = b.unstickDir[0], b.unstickDir[1]
@@ -1290,8 +1365,11 @@ func (b *Bot) decide(act *proto.Action) {
 	} else {
 		mx, my, boost = b.steer(ctx)
 	}
-	if !me.Grounded && b.t >= b.unstickT && !climbing {
+	if !me.Grounded && b.t >= b.unstickT && !climbing && !bolt {
 
+		boost = false
+	}
+	if zoneHold && !bolt && !climbing {
 		boost = false
 	}
 	act.Move = proto.Vec2{mx, my}
@@ -2049,6 +2127,83 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	if best != nil {
 		b.lastObjKind, b.lastObjPos = best.kind, best.pos
 	}
+	return best
+}
+
+func (b *Bot) zoneGoalInside(zEnd zoneC, snapped [2]float64, marginR, in float64) [2]float64 {
+	me := b.me
+	px, py := me.Pos[0], me.Pos[1]
+	if b.t < b.zoneAltT && b.zoneAltC == zEnd && zEnd.outside(b.zoneAltG[0], b.zoneAltG[1]) <= -in {
+		return b.zoneAltG
+	}
+	nv := b.w.Nav
+
+	if c := nv.Nearest(zEnd.c[0], zEnd.c[1], 80); c >= 0 {
+		if cx, cy := nv.Pos(c); zEnd.outside(cx, cy) <= -in {
+			b.searchTick = b.o.Tick
+			if path, cost := nv.Path(px, py, cx, cy, 30000, b.navExtra()); path != nil {
+				depth := math.Min(marginR+4, zEnd.r*0.6)
+				g, acc, tot := path[len(path)-1], 0.0, 0.0
+				found := false
+				for i := 1; i < len(path); i++ {
+					tot += hyp(path[i][0], path[i][1], path[i-1][0], path[i-1][1])
+					if !found && zEnd.outside(path[i][0], path[i][1]) <= -depth {
+						g, acc, found = path[i], tot, true
+					}
+				}
+				if !found {
+					acc = tot
+				}
+				if tot > 1 {
+					acc *= cost / tot
+				}
+				b.zonePathT, b.zonePathG, b.zonePathC = b.t, g, acc
+				b.zoneAltG, b.zoneAltT, b.zoneAltC = g, b.t+3, zEnd
+				return g
+			}
+		}
+	}
+	rT := math.Max(zEnd.r-marginR-4, 0)
+	th0 := math.Atan2(py-zEnd.c[1], px-zEnd.c[0])
+	type cand struct {
+		p [2]float64
+		d float64
+	}
+	var cs []cand
+	for _, rf := range []float64{1, 0.8, 0.6, 0.4, 0.2, 0} {
+		for _, da := range []float64{0, 0.2, -0.2, 0.4, -0.4, 0.6, -0.6, 0.9, -0.9, 1.2, -1.2, 1.6, -1.6, 2.2, -2.2, math.Pi} {
+			x, y := zEnd.c[0]+rT*rf*math.Cos(th0+da), zEnd.c[1]+rT*rf*math.Sin(th0+da)
+			if !nv.WalkableMain(x, y) || zEnd.outside(x, y) > -in {
+				continue
+			}
+			bad := false
+			for _, q := range b.zoneAltBad {
+				if b.t < q[2] && hyp(x, y, q[0], q[1]) < 12 {
+					bad = true
+				}
+			}
+			if !bad {
+				cs = append(cs, cand{[2]float64{x, y}, b.roughDist(x, y)})
+			}
+			if rf == 0 {
+				break
+			}
+		}
+	}
+	if len(cs) == 0 {
+		return snapped
+	}
+	sort.Slice(cs, func(i, j int) bool { return cs[i].d < cs[j].d })
+	best, bc := cs[0].p, math.Inf(1)
+	for i := 0; i < len(cs) && i < 3; i++ {
+		if c := b.pathCostTo(cs[i].p[0], cs[i].p[1]); c >= 0 && c < bc {
+			best, bc = cs[i].p, c
+		}
+	}
+	if !math.IsInf(bc, 1) {
+		b.zonePathT, b.zonePathG, b.zonePathC = b.t, best, bc
+	}
+	b.zoneAltG, b.zoneAltT, b.zoneAltC = best, b.t+3, zEnd
 	return best
 }
 

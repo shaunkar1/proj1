@@ -674,11 +674,64 @@ func Variant(name string) Params {
 		p.EndLow = 10
 		p.EndLowD = 0
 		p.EndLowFarm = true
+	case "el6z":
+		p.FFA0 = "always"
+		p.EndLowZoneR = 180
+	case "el10z":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 180
+	case "el10z240":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 240
+	case "el10z120":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 120
+	case "b1":
+		p.FFA0 = "always"
+		p.EndLow = 6
+		p.ZoneGoalIn = false
+	case "nozg":
+		p.FFA0 = "always"
+		p.ZoneGoalIn = false
+	case "sm35":
+		p.FFA0 = "always"
+		p.ShyMem = 35
 	case "noel":
+		p.FFA0 = "always"
+		p.EndLow = 0
+		p.ZoneGoalIn = false
+		p.HushT = 0
+		p.FleeD = 0
+	case "zg":
+
+		p.FFA0 = "always"
+		p.ZoneGoalIn = true
+	case "zgs":
+
+		p.FFA0 = "always"
+		p.ZoneGoalIn = true
+		p.ZoneStall = 3.5
+	case "zgsr":
+
+		p.FFA0 = "always"
+		p.ZoneGoalIn = true
+		p.ZoneStall = 3.5
+		p.ZoneStallE = 30
+	case "zgz":
+
+		p.FFA0 = "always"
+		p.ZoneGoalIn = true
+		p.EndLowZoneR = 180
+	case "zgnoel":
+
 		p.FFA0 = "always"
 		p.EndLow = 0
 		p.HushT = 0
 		p.FleeD = 0
+		p.ZoneGoalIn = true
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
