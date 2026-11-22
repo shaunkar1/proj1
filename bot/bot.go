@@ -175,6 +175,8 @@ type Params struct {
 	PracDrop        float64
 	PracDropD       float64
 
+	PracMoveAfter   float64
+	PracMoveT       float64
 	PracStandN      int
 	PracStandHP     float64
 	PracLateT       float64
@@ -420,6 +422,8 @@ type Bot struct {
 
 	targetID      int
 	retreating    bool
+	killAt        [2]float64
+	killAtT       float64
 	lastDmgT      float64
 	quietWalkN    int
 	lastDmgBy     int
@@ -901,6 +905,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			}
 		case "kill":
 			b.kills++
+			b.killAt, b.killAtT = [2]float64{o.Self.Pos[0], o.Self.Pos[1]}, o.T
 			delete(b.tracks, e.Target)
 			delete(b.x10.mem, e.Target)
 			if b.targetID == e.Target {

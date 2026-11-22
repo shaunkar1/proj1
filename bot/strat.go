@@ -727,6 +727,18 @@ func (b *Bot) decide(act *proto.Action) {
 		} else if b.P.PracEarlyHP > 0 {
 			retreatHP = b.P.PracEarlyHP
 		}
+		if b.P.PracMoveAfter > 0 && b.killAtT > 0 && tgt != nil {
+			lim := b.P.PracMoveT
+			if lim <= 0 {
+				lim = 12
+			}
+			if b.t-b.killAtT < lim && hyp(px, py, b.killAt[0], b.killAt[1]) < b.P.PracMoveAfter {
+
+				engage = false
+				tgt = nil
+				b.targetID = -1
+			}
+		}
 		if b.P.PracStandN > 0 && nHostile >= b.P.PracStandN && tgt != nil {
 			shp := b.P.PracStandHP
 			if shp <= 0 {
