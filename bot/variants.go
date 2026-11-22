@@ -375,6 +375,19 @@ func Variant(name string) Params {
 		p.HurtHP = 0.9
 		p.HitMem = 60
 		p.LtnObjD = 50
+	case "qa3ls5":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.LateStrike = 5
+	case "ls5ka":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.KeepAwayAlive = 2
+	case "ls5pf":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.PatientFinish = 0.45
 	case "ls6b":
 		p.FFA0 = "always"
 		p.LateStrike = 6
