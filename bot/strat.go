@@ -1254,7 +1254,13 @@ func (b *Bot) decide(act *proto.Action) {
 			ob = b.pickObjective(zEnd, hpFrac, len(mechs) > 0, budget)
 		}
 		b.nearOnly = false
-		if ob == nil && !hurt && b.quiet && b.P.ShyRoam && !b.P.QuietHide && (b.ffaSure || !b.P.NoShyRoam0) {
+		if ob == nil && !hurt && b.openCrowd() {
+
+			mode = "spread"
+			goal, hasGoal = b.openSpreadGoal(zEnd), true
+			ctx.arrive = 6
+			ctx.wGoal = 2
+		} else if ob == nil && !hurt && b.quiet && b.P.ShyRoam && !b.P.QuietHide && (b.ffaSure || !b.P.NoShyRoam0) {
 
 			mode = "shy"
 			if !b.ffaSure && b.P.ShyMove0 {
@@ -2149,7 +2155,15 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	if lasWait {
 		b.h20.n[hLasWaitD]++
 	}
+
+	ocSkip := b.openCrowd()
 	consider := func(ob objective) {
+		if ocSkip {
+			switch ob.kind {
+			case "cube", "crate", "roof", "npc", "npcgo", "site":
+				return
+			}
+		}
 		d := b.roughDist(ob.pos[0], ob.pos[1])
 		lasWant := b.lasWant(&ob, d)
 		lasGo := false

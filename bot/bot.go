@@ -190,6 +190,10 @@ type Params struct {
 	PracTW          int
 	PracIso         float64
 	PracSqD         float64
+	PracOpenCrowdN  int
+	PracOpenCrowdD  float64
+	PracOpenCrowdT  float64
+	PracOpenCrowdA  float64
 	PracDropCrowd   float64
 	FFADropWait     float64
 	FFADrop         float64
@@ -472,6 +476,8 @@ type Bot struct {
 	readyGap      float64
 	shyMoveT      float64
 	shyMoveG      [2]float64
+	ocHoldT       float64
+	ocGoal        [2]float64
 	hideExpo      map[int]float32
 	hideCornerG   [2]float64
 	hideSurvC     [2]float64

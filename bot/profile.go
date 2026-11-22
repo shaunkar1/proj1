@@ -108,6 +108,22 @@ func ApplyProfile(p *Params, name string) {
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracIso = v2
 				}
+			case len(m) > 3 && m[:3] == "ocd":
+				if v2, err := strconv.ParseFloat(m[3:], 64); err == nil {
+					p.PracOpenCrowdD = v2
+				}
+			case len(m) > 3 && m[:3] == "oct":
+				if v2, err := strconv.ParseFloat(m[3:], 64); err == nil {
+					p.PracOpenCrowdT = v2
+				}
+			case len(m) > 3 && m[:3] == "oca":
+				if v2, err := strconv.ParseFloat(m[3:], 64); err == nil {
+					p.PracOpenCrowdA = v2
+				}
+			case len(m) > 2 && m[:2] == "oc":
+				if v2, err := strconv.Atoi(m[2:]); err == nil {
+					p.PracOpenCrowdN = v2
+				}
 			case len(m) > 2 && m[:2] == "sq":
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracSqD = v2

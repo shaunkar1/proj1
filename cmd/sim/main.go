@@ -522,5 +522,9 @@ func main() {
 		}
 		fmt.Printf("%-10s laser %d/%d (%.2f)  min2 %.2f min4 %.2f\n", k, lh, ls, float64(lh)/float64(max(ls, 1)), m2/c, m4/c)
 	}
+	if f, mv := bot.OpenCrowdStats(); f > 0 || mv > 0 {
+
+		fmt.Printf("opencrowd condition-true decisions %d, goals chosen %d\n", f, mv)
+	}
 	fmt.Println("elapsed", time.Since(t0).Round(time.Millisecond))
 }
