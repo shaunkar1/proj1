@@ -409,6 +409,30 @@ func Variant(name string) Params {
 		p.LateApproach = 2.5
 		p.LateApproachR = 1.18
 		p.PatientFinish = 0.45
+	case "fd1":
+		p.FFA0 = "always"
+		p.FFADropFree, p.FFADropFreeD = 100, 150
+	case "fd2":
+		p.FFA0 = "always"
+		p.FFADropFree, p.FFADropFreeD = 150, 200
+	case "rl1":
+		p.FFA0 = "always"
+		p.RoofLoot, p.RoofLootClear = true, 150
+	case "qx1":
+		p.FFA0 = "always"
+		p.QuietScout, p.QuietScoutClear = 70, 150
+	case "qx2":
+		p.FFA0 = "always"
+		p.QuietScout, p.QuietScoutClear = 45, 150
+	case "fdrl":
+		p.FFA0 = "always"
+		p.FFADropFree, p.FFADropFreeD = 100, 150
+		p.RoofLoot, p.RoofLootClear = true, 150
+	case "fdrlqx":
+		p.FFA0 = "always"
+		p.FFADropFree, p.FFADropFreeD = 100, 150
+		p.RoofLoot, p.RoofLootClear = true, 150
+		p.QuietScout, p.QuietScoutClear = 70, 150
 	case "ka2pf":
 		p.FFA0 = "always"
 		p.KeepAwayAlive = 2
