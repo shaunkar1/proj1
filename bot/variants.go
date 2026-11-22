@@ -754,6 +754,12 @@ func Variant(name string) Params {
 		p.FFA0 = "always"
 		p.FarmNPC = false
 		p.RoofLoot, p.RoofLootClear = true, 150
+	case "hd2s":
+		p.FFA0 = "always"
+		p.FarmNPC = false
+		p.Open = false
+		p.HuntPassive = false
+		p.ShyMem = 35
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
