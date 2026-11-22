@@ -185,7 +185,11 @@ func (s *Sim) hurt(m *Mech, amount float64, weapon string, by int, byNPC bool, f
 		if byNPC {
 			by2 = 100
 		}
-		m.DmgLog = append(m.DmgLog, DmgRec{s.T, by2, weapon, amount, hyp(from[0], from[1], m.Pos[0], m.Pos[1])})
+		ad := -1.0
+		if !byNPC && by >= 0 && by < len(s.Mechs) {
+			ad = hyp(s.Mechs[by].Pos[0], s.Mechs[by].Pos[1], m.Pos[0], m.Pos[1])
+		}
+		m.DmgLog = append(m.DmgLog, DmgRec{s.T, by2, weapon, amount, hyp(from[0], from[1], m.Pos[0], m.Pos[1]), ad, m.HP, rear})
 	}
 	ev := proto.Event{Type: "damaged", Amount: amount, Weapon: weapon, Bearing: fltp(bearing), Rear: rear}
 	if !byNPC {

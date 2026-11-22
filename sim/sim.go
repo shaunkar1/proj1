@@ -80,6 +80,9 @@ type DmgRec struct {
 	Weapon string
 	Amount float64
 	Dist   float64
+	ADist  float64
+	HP     float64
+	Rear   bool
 }
 
 func (m *Mech) Scale(cfg *proto.Config) float64 {

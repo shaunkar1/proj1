@@ -127,6 +127,7 @@ func main() {
 	trace := flag.String("trace", "", "write a trace of the first match to this file")
 	statsF := flag.String("stats", "", "ffa: write one JSON line per match (results; with -statpos also hits and 1 Hz positions)")
 	statPos := flag.Bool("statpos", false, "ffa: include hits and positions in -stats")
+	plog := flag.String("plog", "", "practice: write one JSON line per match with a 2 Hz timeline of the candidate (logging only)")
 	mlines := flag.Bool("mlines", false, "ffa: print one '#M {json}' line per match (results, openings, per-mech measurements)")
 	flag.Parse()
 
@@ -151,6 +152,16 @@ func main() {
 		defer statW.Flush()
 	}
 
+	var plogW *bufio.Writer
+	if *plog != "" {
+		f, err := os.Create(*plog)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		plogW = bufio.NewWriterSize(f, 1<<20)
+		defer plogW.Flush()
+	}
 	var mu sync.Mutex
 	res := map[string][]result{}
 	jobs := make(chan int64)
@@ -303,7 +314,22 @@ func main() {
 				if *trace != "" && sd == *seed {
 					s.Rec = &sim.Recorder{}
 				}
-				if *mode == "practice" && s.Rec == nil {
+				var pl *pracLog
+				if *mode == "practice" && s.Rec == nil && plogW != nil {
+					pl = &pracLog{Seed: sd}
+					for !s.Done && s.Mechs[mySlot].Alive {
+						if s.Tick%10 == 0 {
+							pl.sample(s, sq, mySlot, tm)
+						}
+						s.Step()
+					}
+					pl.finish(s, mySlot, names[mySlot])
+					mu.Lock()
+					jb, _ := json.Marshal(pl)
+					plogW.Write(jb)
+					plogW.WriteByte('\n')
+					mu.Unlock()
+				} else if *mode == "practice" && s.Rec == nil {
 					for !s.Done && s.Mechs[mySlot].Alive {
 						s.Step()
 					}

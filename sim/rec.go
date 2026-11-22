@@ -21,3 +21,5 @@ func (r *Recorder) frame(s *Sim) {
 	}
 	r.Frames = append(r.Frames, f)
 }
+
+func (s *Sim) ZoneNow() ([2]float64, float64) { return s.zc, s.zr }

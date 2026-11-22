@@ -169,6 +169,13 @@ type Params struct {
 	QuietAvoidD     float64
 	PracDrop        float64
 	PracDropD       float64
+
+	PracKS          float64
+	PracStickyOn    bool
+	PracStickyT     float64
+	PracCubeMax     int
+	PracDropWise    float64
+	PracStand       float64
 	FFADropWait     float64
 	FFADrop         float64
 	RngSalt         int
@@ -473,6 +480,11 @@ type Bot struct {
 	seed          int64
 	peer          *Track
 	sawOtherDeath bool
+	ksN           int
+	ksPrevT       float64
+	pracLatch     bool
+	standT        float64
+	standOn       bool
 	quiet         bool
 	endLow        bool
 	hush          bool
@@ -866,7 +878,41 @@ func (b *Bot) perceive(o *proto.Obs) {
 	if !b.ffaSure && b.wallOn && b.P.FFA0 != "" && o.T < 2 && b.ffaByClock() {
 		b.ffaSure, b.sawOtherDeath = true, true
 	}
-	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills
+	b.othersDied = int(b.cfg.Match.Mechs) - o.Alive - b.kills - b.ksN
+	if b.P.PracKS > 0 && b.othersDied > 0 && !b.sawOtherDeath && !b.ffaSure && o.T >= 40 {
+
+		present := map[int]bool{}
+		for i := range o.Mechs {
+			present[o.Mechs[i].ID] = true
+		}
+		ids := make([]int, 0, len(b.tracks))
+		for id := range b.tracks {
+			ids = append(ids, id)
+		}
+		sort.Ints(ids)
+		for _, id := range ids {
+			t := b.tracks[id]
+			if b.othersDied <= 0 {
+				break
+			}
+			if t.NPC || t.Ghost || present[id] || o.T-t.IHit > b.P.PracKS || t.Seen < b.ksPrevT-0.01 {
+				continue
+			}
+			b.ksN++
+			b.othersDied--
+			delete(b.tracks, id)
+			if b.targetID == id {
+				b.targetID = -1
+			}
+		}
+	}
+	b.ksPrevT = o.T
+	if b.P.PracStickyOn && !b.ffaSure && !b.sawOtherDeath && o.T >= b.P.PracStickyT {
+		b.pracLatch = true
+	}
+	if b.pracLatch {
+		b.othersDied = 0
+	}
 	if b.othersDied > 0 {
 		b.sawOtherDeath = true
 		if o.T < 40 {
@@ -980,6 +1026,8 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 }
 
 func (b *Bot) DbgMode() string { return b.dbg }
+
+func (b *Bot) DbgTarget() int { return b.targetID }
 
 func (b *Bot) ffaAtStart() bool {
 	if b.P.FFAAfter > 0 && b.wallOn {

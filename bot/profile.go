@@ -92,6 +92,26 @@ func ApplyProfile(p *Params, name string) {
 				p.PracUpgradePrio = dmgFirst
 			case m == "ltn":
 				p.PracLtnRank = 3.4
+			case m == "kp":
+				p.PracStickyOn, p.PracStickyT = true, 40
+			case len(m) > 2 && m[:2] == "kp":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracStickyOn, p.PracStickyT = true, v2
+				}
+			case m == "ks":
+				p.PracKS = 4
+			case len(m) > 2 && m[:2] == "ks":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracKS = v2
+				}
+			case len(m) > 2 && m[:2] == "ls":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracStand = v2 / 100
+				}
+			case m[0] == 'm':
+				p.PracCubeMax = int(v)
+			case m[0] == 'y':
+				p.PracDropWise = v / 100
 			case m[0] == 'p':
 				p.PracRange = v
 			case m[0] == 'q':
