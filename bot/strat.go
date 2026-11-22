@@ -1431,7 +1431,14 @@ func (b *Bot) decide(act *proto.Action) {
 func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 	if b.patient {
 		// three left: let the other two settle it unless one is on us
-		return b.t-t.HitMe < 4 || (b.t < t.Hostile && d < 70) || (t.HP < 0.3*t.MaxHP && d < 130 && hpFrac > 0.5)
+		if b.t-t.HitMe < 4 || (b.t < t.Hostile && d < 70) || (t.HP < 0.3*t.MaxHP && d < 130 && hpFrac > 0.5) {
+			return true
+		}
+		if b.lateStrike(t, d, hpFrac) {
+			t.Hostile = math.Max(t.Hostile, b.t+8)
+			return true
+		}
+		return false
 	}
 	if b.farmPhase {
 		if b.practice {
@@ -2305,6 +2312,29 @@ func (b *Bot) isOpening(t *Track, d, hpFrac float64) bool {
 		return true
 	}
 	return b.t-t.busyT < 3 && d < b.P.OpenBusyD
+}
+
+// lateStrike: few mechs left and we are healthy with a laser - take the first
+// shot at a lone mech that is no stronger than us instead of waiting for its.
+func (b *Bot) lateStrike(t *Track, d, hpFrac float64) bool {
+	if b.P.LateStrike <= 0 || !b.ffaSure || b.practice || b.o.Alive > b.P.LateStrike || t.NPC || t.Ghost || !t.LOS || b.t-t.Seen > 0.3 {
+		return false
+	}
+	if hpFrac < b.P.LateStrikeHP || d > b.P.LateStrikeD || d < 20 || b.boss != nil {
+		return false
+	}
+	if las, _ := b.weapon("laser"); las == nil || d > las.Stats.Range-15 {
+		return false
+	}
+	if t.HP > b.me.HP || b.dangerRatio(t) > b.P.LateStrikeRatio {
+		return false
+	}
+	for _, o := range b.trackL {
+		if o != t && !o.NPC && !o.Ghost && b.t-o.Seen < 4 {
+			return false
+		}
+	}
+	return true
 }
 
 // isPrey: a mech we clearly outclass (kills are the main source of cubes).

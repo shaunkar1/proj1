@@ -359,6 +359,26 @@ func Variant(name string) Params {
 		p.QuietNoChase = true
 		p.SafeAway = 1.0
 		p.QuietNoClose = true
+	case "ls5":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+	case "ls4":
+		p.FFA0 = "always"
+		p.LateStrike = 4
+	case "ls7":
+		p.FFA0 = "always"
+		p.LateStrike = 7
+	case "ls5r":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.LateStrikeRatio = 1.4
+	case "ls5h":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.LateStrikeHP = 0.65
+	case "ls3":
+		p.FFA0 = "always"
+		p.LateStrike = 3
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
