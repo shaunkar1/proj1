@@ -637,6 +637,19 @@ func Variant(name string) Params {
 		p.FFA0 = "always"
 		p.HushT = 0
 		p.FleeD = 0
+	case "e2":
+		p.FFA0 = "always"
+		p.ShyHold = 25
+		p.HushT = 45
+		p.FleeD = 0
+	case "hf":
+		p.FFA0 = "always"
+		p.HushT = 45
+		p.FleeD = 130
+	case "fonly":
+		p.FFA0 = "always"
+		p.HushT = 0
+		p.FleeD = 130
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
