@@ -2146,6 +2146,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 
 	lasWait := b.lasWaiting()
+	if lasWait {
+		b.h20.n[hLasWaitD]++
+	}
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
 		lasWant := b.lasWant(&ob, d)
@@ -2876,6 +2879,11 @@ func (b *Bot) scan(act *proto.Action, hasGoal bool, goal [2]float64) {
 		return
 	case b.P.EarP > 0 && b.earT > 0 && b.t-b.earHeardT < 3:
 		act.Aim = [2]float64{b.earDir, 0}
+		return
+	}
+	if a, ok := b.duelAim(); ok {
+
+		act.Aim = [2]float64{a, 0}
 		return
 	}
 	if b.P.SpinScan {

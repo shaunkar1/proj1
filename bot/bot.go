@@ -270,6 +270,7 @@ type Params struct {
 	LasRush    float64
 	LasSafe    float64
 	LasWait    bool
+	LasRushT   float64
 	GlLaser    bool
 	GlHP       float64
 	GlHurt     float64
@@ -278,6 +279,8 @@ type Params struct {
 	CorpseD    float64
 	CorpseAge  float64
 	CorpseSafe float64
+	DuelHold   bool
+	DuelMem    float64
 }
 
 func DefaultParams() Params {

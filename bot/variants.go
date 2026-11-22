@@ -681,7 +681,7 @@ func Variant(name string) Params {
 		case "n4noend":
 			p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 		}
-	case "n4laser", "n4laser150", "n4laser250", "n4laserx", "n4lasernw", "n4lasdiag", "n4gl", "n4corpse", "n4sel":
+	case "n4laser", "n4laser150", "n4laser250", "n4laser250e", "n4laserx", "n4lasernw", "n4lasdiag", "n4gl", "n4corpse", "n4corpse30", "n4duel", "n4sel":
 
 		p.FFA0 = "always"
 		las := func(r, safe float64, wait bool) {
@@ -693,13 +693,16 @@ func Variant(name string) Params {
 		}
 		corpse := func() {
 
-			p.CorpseD, p.CorpseAge, p.CorpseSafe = 250, 30, 100
+			p.CorpseD, p.CorpseAge, p.CorpseSafe = 200, 10, 100
 		}
 		switch name {
 		case "n4laser", "n4laser150":
 			las(150, 100, true)
 		case "n4laser250":
 			las(250, 100, true)
+		case "n4laser250e":
+			las(250, 100, true)
+			p.LasRushT = 90
 		case "n4laserx":
 			las(250, 0, false)
 		case "n4lasernw":
@@ -710,6 +713,12 @@ func Variant(name string) Params {
 			green()
 		case "n4corpse":
 			corpse()
+		case "n4corpse30":
+
+			corpse()
+			p.CorpseAge = 30
+		case "n4duel":
+			p.DuelHold, p.DuelMem = true, 25
 		case "n4sel":
 			las(250, 100, true)
 			green()
