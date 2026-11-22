@@ -365,6 +365,9 @@ func (b *Bot) decide(act *proto.Action) {
 		b.quiet = false
 	}
 	b.endLow = b.P.EndLow > 0 && b.ffaSure && !b.practice && b.othersDied > 0 && o.Alive <= b.P.EndLow && o.Alive > 2
+	if b.endLow && b.P.EndLowZoneR > 0 && o.Zone.Radius < b.P.EndLowZoneR {
+		b.endLow = false
+	}
 	if b.endLow {
 
 		b.quiet = true

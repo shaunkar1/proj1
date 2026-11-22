@@ -674,6 +674,21 @@ func Variant(name string) Params {
 		p.EndLow = 10
 		p.EndLowD = 0
 		p.EndLowFarm = true
+	case "el6z":
+		p.FFA0 = "always"
+		p.EndLowZoneR = 180
+	case "el10z":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 180
+	case "el10z240":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 240
+	case "el10z120":
+		p.FFA0 = "always"
+		p.EndLow = 10
+		p.EndLowZoneR = 120
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0

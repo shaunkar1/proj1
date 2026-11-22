@@ -130,6 +130,7 @@ type Params struct {
 	LateStrikeRatio float64
 	QuietNoChase    bool
 	EndLow          int
+	EndLowZoneR     float64
 	EndLowD         float64
 	EndLowFarm      bool
 	HushT           float64
