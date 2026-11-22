@@ -791,6 +791,13 @@ func (b *Bot) decide(act *proto.Action) {
 			// wounded and alone: stay on it so it cannot break off and repair
 			prefD = b.P.ChaseD
 		}
+		if b.P.QuietNoClose && b.ffaSure && b.quiet && !b.practice && !finishing && tgt.HP > 0.3*tgt.MaxHP {
+			// recorded matches (521 first-hit victims): closing on the attacker in the next 5 s -> 43% dead within
+			// 20 s and place 9.2; opening the gap -> 28% and 7.8, in every distance / HP / laser stratum
+			if dNow := hyp(px, py, tgt.Pos[0], tgt.Pos[1]); dNow > prefD {
+				prefD = math.Min(dNow+10, 190)
+			}
+		}
 		ctx.pref = prefD
 		for i := range threats {
 			if threats[i].t == tgt {
