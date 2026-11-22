@@ -18,6 +18,13 @@ func fieldBase(p *Params) {
 
 	p.HushT = 0
 	p.FleeD = 0
+	pinB3(p)
+}
+
+func pinB3(p *Params) {
+	p.FFAPassive = false
+	p.HideStick, p.HideStill, p.HideCover = 0, false, 0
+	p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 }
 
 func (b *Bot) campPhase() bool {

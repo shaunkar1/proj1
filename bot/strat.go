@@ -2249,7 +2249,7 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	if g, ok := b.earGoal(); ok && hpFrac > 0.6 {
 		consider(objective{kind: "ear", pos: [3]float64{g[0], g[1], me.Pos[2]}, value: 260})
 	}
-	if b.P.HuntPassive && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
+	if b.P.HuntPassive && !(b.P.FFAPassive && b.ffaSure && !b.practice) && hpFrac > 0.8 && b.t > b.P.HuntAfter && !b.farmPhase && !b.patient {
 		for _, t := range b.trackL {
 			if t.NPC || b.t-t.Seen > 20 || (b.t > t.Hostile && !b.P.Aggressive && !(b.practice && b.P.PracAggro) && !b.isPrey(t, hyp(px, py, t.Pos[0], t.Pos[1]), hpFrac)) {
 				continue
@@ -2704,7 +2704,7 @@ func (b *Bot) isBlind(t *Track, d, hpFrac float64) bool {
 }
 
 func (b *Bot) isOpening(t *Track, d, hpFrac float64) bool {
-	if !b.P.Open || !b.ffaSure || b.practice || t.NPC || t.Ghost || !t.LOS || b.t-t.Seen > 0.3 || hpFrac < b.P.OpenHP || b.boss != nil {
+	if !b.P.Open || b.P.FFAPassive || !b.ffaSure || b.practice || t.NPC || t.Ghost || !t.LOS || b.t-t.Seen > 0.3 || hpFrac < b.P.OpenHP || b.boss != nil {
 		return false
 	}
 	if b.t-b.lastDmgT < 3 {

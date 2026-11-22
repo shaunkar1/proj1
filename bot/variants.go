@@ -8,6 +8,9 @@ import (
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name
+	if name != "ffa0" && !strings.HasPrefix(name, "n4") {
+		pinB3(&p)
+	}
 	switch name {
 	case "hunterAe", "hunterB2e", "brawle", "hunterAet", "hunterB2et", "brawlet", "campRet", "campR2et":
 
@@ -656,6 +659,20 @@ func Variant(name string) Params {
 			p.EndThird = 100
 		case "cb8":
 			p.HideStick, p.HideStill, p.HideCover = 40, true, 120
+		}
+	case "b3":
+
+		p.FFA0 = "always"
+	case "n4nop", "n4nohide", "n4noend":
+
+		p.FFA0 = "always"
+		switch name {
+		case "n4nop":
+			p.FFAPassive = false
+		case "n4nohide":
+			p.HideStick, p.HideStill, p.HideCover = 0, false, 0
+		case "n4noend":
+			p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 		}
 	case "hs40":
 
