@@ -118,6 +118,11 @@ type Params struct {
 	LateStrikeHP    float64
 	LateStrikeRatio float64
 	QuietNoChase    bool
+	EndLow          int
+	EndLowD         float64
+	EndLowFarm      bool
+	ScanAhead       float64
+	EndScan         int
 	EndgameFFA      int
 	QuietAlive      int
 	FFAAfter        int64
@@ -188,7 +193,7 @@ func baseParams() Params {
 			"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"},
 		WeaponRank: map[string]float64{"lightning": 2.6, "laser": 3, "mortar": 0, "gun": 0.5},
 		LeadScale:  1.0,
-		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietAlive: 6, QuietCap: 300, EndgameFFA: 16, QuietAdvD: 50, FleeLaser: 1, QuietNoClose: true, QuietNoChase: true, SafeAway: 1.0, LateStrikeD: 130, LateStrikeHP: 0.8, LateStrikeRatio: 1.0, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
+		PracNoPeek: true, PracNearFarm: true, NoExplore: false, BossRatio: 1.5, HardRatio: 0, Sites: true, RoofBold: true, PeerAvoidD: 60, PeerObjD: 45, BossObjD: 100, BossAvoidD: 90, BossSeenD: 220, PileBonus: 30, Grab: 45, GrabCube: 18, PracDropD: 200, KeepAwayD: 90, KeepAwayRatio: 0.9, KeepAwayAlive: 6, QuietT: 90, QuietNoAim: true, QuietAlive: 6, QuietCap: 300, EndgameFFA: 16, QuietAdvD: 50, FleeLaser: 1, QuietNoClose: true, QuietNoChase: true, SafeAway: 1.0, LateStrikeD: 130, LateStrikeHP: 0.8, LateStrikeRatio: 1.0, EndLowD: 40, EndScan: 6, QuietObjD: 120, BossFarD: 150, ShyD: 150, ShyFarD: 190, ShyNear0: 40, ShyLaserD: 70, ShyRoam: true, QuietAvoidD: 150, FFADrop: 0.6, FFADropWait: 10, ScanFirst: true, Calm: false, ObjHide: true, EvadeSniper: true, Open: true, NoOpenLas: true, OpenRatio: 1.6, OpenHP: 0.6, OpenBusyD: 180, NPCValue: 170, NPCMemory: true, PracRetreatHP: -1, PracAggroD: 160, PracAggroHP: 0.6, SiteFar: 240, SiteFarVal: 0, SiteTTL: 150,
 		Roof: true,
 	}
 }
@@ -384,8 +389,11 @@ type Bot struct {
 	peer          *Track
 	sawOtherDeath bool
 	quiet         bool
+	endLow        bool
 	dropSeen      map[int]float64
 	dbgObj        int
+	DbgGoal       [2]float64
+	DbgHasGoal    bool
 	grabID        int
 	grabT         float64
 	hop           *geo.Exit
