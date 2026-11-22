@@ -174,6 +174,8 @@ type Params struct {
 	PracDrop        float64
 	PracDropD       float64
 
+	PracLateT       float64
+	PracEarlyHP     float64
 	PracKS          float64
 	PracStickyOn    bool
 	PracStickyT     float64
