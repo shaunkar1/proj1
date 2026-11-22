@@ -699,6 +699,23 @@ func Variant(name string) Params {
 	case "sm35":
 		p.FFA0 = "always"
 		p.ShyMem = 35
+	case "hdn":
+		p.FFA0 = "always"
+		p.FarmNPC = false
+	case "hdo":
+		p.FFA0 = "always"
+		p.Open = false
+		p.HuntPassive = false
+	case "hd2rl":
+		p.FFA0 = "always"
+		p.FarmNPC = false
+		p.Open = false
+		p.HuntPassive = false
+		p.RoofLoot, p.RoofLootClear = true, 150
+	case "hdnrl":
+		p.FFA0 = "always"
+		p.FarmNPC = false
+		p.RoofLoot, p.RoofLootClear = true, 150
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
