@@ -681,6 +681,10 @@ func Variant(name string) Params {
 		case "n4noend":
 			p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 		}
+	case "b4":
+
+		p.FFA0 = "always"
+		p.ZoneRun, p.ZoneRunStall = 0, 0
 	case "n4zrun", "n4zrunh", "n4zruns", "n4zgn", "n4b13z", "n4unw", "n4b13":
 
 		p.FFA0 = "always"

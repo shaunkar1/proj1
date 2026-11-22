@@ -98,6 +98,24 @@ func ApplyProfile(p *Params, name string) {
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracStickyOn, p.PracStickyT = true, v2
 				}
+			case m == "ua":
+				p.PracUpgradePrio = armorFirst
+			case len(m) > 2 && m[:2] == "tw":
+				if v2, err := strconv.Atoi(m[2:]); err == nil {
+					p.PracTW = v2
+				}
+			case len(m) > 2 && m[:2] == "is":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracIso = v2
+				}
+			case len(m) > 2 && m[:2] == "sq":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracSqD = v2
+				}
+			case len(m) > 2 && m[:2] == "dc":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracDropCrowd = v2
+				}
 			case m == "ks":
 				p.PracKS = 4
 			case len(m) > 2 && m[:2] == "ks":
@@ -439,6 +457,10 @@ func ApplyProfile(p *Params, name string) {
 
 var ltnFirst = []string{"lightning_efficiency", "lightning_chain", "plating", "armor", "capacitor", "reactor", "nanites", "gun_damage", "gun_rate",
 	"laser_damage", "laser_charge", "lightning_range", "servos", "gyros", "gun_mag", "mortar_reload", "mortar_splash",
+	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
+
+var armorFirst = []string{"plating", "armor", "nanites", "laser_damage", "gun_damage", "gun_rate", "laser_charge", "lightning_efficiency",
+	"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
 
 var dmgFirst = []string{"laser_damage", "gun_damage", "gun_rate", "laser_charge", "plating", "armor", "nanites", "lightning_efficiency",

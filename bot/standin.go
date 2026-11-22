@@ -23,6 +23,7 @@ func fieldBase(p *Params) {
 
 func pinB3(p *Params) {
 	p.FFAPassive = false
+	p.ZoneRun, p.ZoneRunStall = 0, 0
 	p.HideStick, p.HideStill, p.HideCover = 0, false, 0
 	p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = 0, 0, 0, 0
 }
@@ -92,6 +93,7 @@ func (b *Bot) earGoal() ([2]float64, bool) {
 func unpinB4(p *Params) {
 	d := DefaultParams()
 	p.FFAPassive = d.FFAPassive
+	p.ZoneRun, p.ZoneRunStall = d.ZoneRun, d.ZoneRunStall
 	p.HideStick, p.HideStill, p.HideCover = d.HideStick, d.HideStill, d.HideCover
 	p.EndPounce, p.EndRushD, p.EndPounceT, p.EndRefuse = d.EndPounce, d.EndRushD, d.EndPounceT, d.EndRefuse
 }

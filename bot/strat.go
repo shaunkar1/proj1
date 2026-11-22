@@ -466,6 +466,14 @@ func (b *Bot) decide(act *proto.Action) {
 		if t.ID == b.targetID {
 			v += 150
 		}
+		if b.practice && b.P.PracIso > 0 {
+
+			for _, u := range b.trackL {
+				if u != t && !u.NPC && !u.Ghost && b.t-u.Seen < 8 && hyp(u.Pos[0], u.Pos[1], t.Pos[0], t.Pos[1]) < 90 {
+					v -= b.P.PracIso
+				}
+			}
+		}
 		if v > bestV {
 			bestV, tgt = v, t
 		}
@@ -715,6 +723,18 @@ func (b *Bot) decide(act *proto.Action) {
 		if hpFrac < retreatHP && (incoming > 0 || b.t-b.lastDmgT < 3) && !finishing {
 			b.retreating = true
 		}
+		if b.practice && b.P.PracTW > 0 && hpFrac < 0.8 && !finishing && b.t-b.lastDmgT < 2 {
+
+			n := 0
+			for _, t := range b.trackL {
+				if !t.NPC && !t.Ghost && b.t-t.HitMe < 4 {
+					n++
+				}
+			}
+			if n >= b.P.PracTW {
+				b.retreating = true
+			}
+		}
 	} else if hpFrac > b.P.ReengageHP || (len(mechs) == 0 && b.t-b.lastDmgT > 6 && hpFrac > 0.55) {
 		b.retreating = false
 	}
@@ -891,6 +911,20 @@ func (b *Bot) decide(act *proto.Action) {
 					continue
 				}
 				if (b.t-b.lastDmgT < 2.5 || nHostile > 0) && dist > 60 {
+					continue
+				}
+			}
+			if b.practice && b.P.PracDropCrowd > 0 && dist > 25 {
+				nn := 0
+				for _, t := range b.trackL {
+					if t.NPC || t.Ghost || b.t-t.Seen > 6 {
+						continue
+					}
+					if hyp(d.Pos[0], d.Pos[1], t.Pos[0], t.Pos[1]) < b.P.PracDropCrowd || hyp(px, py, t.Pos[0], t.Pos[1]) < 0.6*b.P.PracDropCrowd {
+						nn++
+					}
+				}
+				if nn >= 2 {
 					continue
 				}
 			}
@@ -2078,6 +2112,17 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 		if b.x10Skip(&ob, d) {
 			return
+		}
+		if b.practice && b.P.PracSqD > 0 && d > 12 {
+			nn := 0
+			for _, t := range b.trackL {
+				if !t.NPC && !t.Ghost && b.t-t.Seen < 8 && hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1]) < b.P.PracSqD {
+					nn++
+				}
+			}
+			if nn >= 2 {
+				return
+			}
 		}
 		for _, t := range keep {
 			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
