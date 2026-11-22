@@ -6,8 +6,6 @@ import (
 	"mechbot/proto"
 )
 
-// Expert is a squad member driven by the real pilot: it never targets
-// squad-mates and, when hunting, is fed the squad's shared sightings.
 type Expert struct {
 	inner    *bot.Bot
 	sq       *Squad

@@ -1,5 +1,3 @@
-// Package geo holds the static map: terrain, solid prisms, trees, and the
-// queries built on them (shot raycasts, sight lines, surfaces, navigation).
 package geo
 
 import (
@@ -20,8 +18,8 @@ type Tree struct {
 type World struct {
 	MinX, MinY    float64
 	NX, NY        int
-	H             []float32 // terrain heights, vertex grid, 1 m
-	off           []int32   // per cell offset into iv (len NX*NY+1)
+	H             []float32
+	off           []int32
 	iv            []Interval
 	BMinX, BMaxX  float64
 	BMinY, BMaxY  float64
@@ -226,7 +224,6 @@ func pointInRing(r []float64, x, y float64) bool {
 	return in
 }
 
-// cell returns the raster index of the vertex nearest (x,y), or -1 outside.
 func (w *World) cell(x, y float64) int {
 	i := int(math.Floor(x - w.MinX + 0.5))
 	j := int(math.Floor(y - w.MinY + 0.5))
@@ -236,8 +233,6 @@ func (w *World) cell(x, y float64) int {
 	return j*w.NX + i
 }
 
-// SetMargin shrinks the playable area: the arena wall stands this far inside
-// the map bounds (config match.arena_margin). Call before BuildNav.
 func (w *World) SetMargin(m float64) {
 	w.BMinX += m - w.margin
 	w.BMaxX -= m - w.margin
@@ -250,7 +245,6 @@ func (w *World) InBounds(x, y float64) bool {
 	return x >= w.BMinX && x <= w.BMaxX && y >= w.BMinY && y <= w.BMaxY
 }
 
-// Ground is the bilinear terrain height.
 func (w *World) Ground(x, y float64) float64 {
 	fx := x - w.MinX
 	fy := y - w.MinY
@@ -278,7 +272,6 @@ func (w *World) Ground(x, y float64) float64 {
 	return (h00*(1-tx)+h10*tx)*(1-ty) + (h01*(1-tx)+h11*tx)*ty
 }
 
-// Intervals returns the solid prism spans over the cell at (x,y).
 func (w *World) Intervals(x, y float64) []Interval {
 	c := w.cell(x, y)
 	if c < 0 {
@@ -287,7 +280,6 @@ func (w *World) Intervals(x, y float64) []Interval {
 	return w.iv[w.off[c]:w.off[c+1]]
 }
 
-// SolidAt reports whether the point is inside terrain or a prism.
 func (w *World) SolidAt(x, y, z float64) bool {
 	c := w.cell(x, y)
 	if c < 0 {
@@ -304,8 +296,6 @@ func (w *World) SolidAt(x, y, z float64) bool {
 	return false
 }
 
-// Surface is the highest standable surface at (x,y) not above zmax
-// (terrain or a prism top). ok=false if even the terrain is above zmax.
 func (w *World) Surface(x, y, zmax float64) (float64, bool) {
 	g := w.Ground(x, y)
 	if g > zmax {
@@ -321,8 +311,6 @@ func (w *World) Surface(x, y, zmax float64) (float64, bool) {
 	return s, true
 }
 
-// BodyBlocked reports whether a prism occupies any part of the column
-// (z0,z1) at (x,y), or the map edge is crossed.
 func (w *World) BodyBlocked(x, y, z0, z1 float64) bool {
 	if !w.InBounds(x, y) {
 		return true
@@ -335,7 +323,6 @@ func (w *World) BodyBlocked(x, y, z0, z1 float64) bool {
 	return false
 }
 
-// TopAt returns the highest prism top over the cell (roof height), or ground.
 func (w *World) TopAt(x, y float64) float64 {
 	s := w.Ground(x, y)
 	for _, iv := range w.Intervals(x, y) {
@@ -346,8 +333,6 @@ func (w *World) TopAt(x, y float64) float64 {
 	return s
 }
 
-// RayHit marches a shot from a to b and returns the fraction (0..1) at which
-// it first enters terrain or a prism; 1 and false if it is clear.
 func (w *World) RayHit(ax, ay, az, bx, by, bz float64) (float64, bool) {
 	dx, dy, dz := bx-ax, by-ay, bz-az
 	l := math.Sqrt(dx*dx + dy*dy + dz*dz)
@@ -379,13 +364,11 @@ func (w *World) RayHit(ax, ay, az, bx, by, bz float64) (float64, bool) {
 	return 1, false
 }
 
-// Clear reports whether a straight shot from a to b meets no terrain or prism.
 func (w *World) Clear(ax, ay, az, bx, by, bz float64) bool {
 	_, hit := w.RayHit(ax, ay, az, bx, by, bz)
 	return !hit
 }
 
-// ClearCoarse is Clear with 1 m steps (cheaper, for tactical sampling).
 func (w *World) ClearCoarse(ax, ay, az, bx, by, bz float64) bool {
 	dx, dy, dz := bx-ax, by-ay, bz-az
 	l := math.Sqrt(dx*dx + dy*dy + dz*dz)
@@ -417,8 +400,6 @@ func (w *World) ClearCoarse(ax, ay, az, bx, by, bz float64) bool {
 	return true
 }
 
-// Sees reports a sight line: buildings and terrain block, tree trunks block,
-// and crowns block once enough foliage has been crossed.
 func (w *World) Sees(ax, ay, az, bx, by, bz float64) bool {
 	if !w.Clear(ax, ay, az, bx, by, bz) {
 		return false

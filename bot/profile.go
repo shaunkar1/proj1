@@ -5,11 +5,8 @@ import (
 	"strings"
 )
 
-// Profile selects the squad-match (practice) tuning compiled into the bot.
 const Profile = "base"
 
-// ApplyProfile adjusts only the parameters used in squad matches, so the
-// free-for-all behaviour is the same under every profile.
 func ApplyProfile(p *Params, name string) {
 	if strings.HasPrefix(name, "mix:") || strings.HasPrefix(name, "mixs:") || strings.HasPrefix(name, "mixl:") {
 
@@ -428,8 +425,6 @@ var dmgFirst = []string{"laser_damage", "gun_damage", "gun_rate", "laser_charge"
 	"servos", "lightning_chain", "capacitor", "reactor", "gyros", "gun_mag", "lightning_range", "mortar_reload", "mortar_splash",
 	"gun_velocity", "mortar_velocity", "sensors", "jets", "laser_pierce"}
 
-// mixPick resolves a "mix:<M>:<assign>|P0|P1|..." profile for one match: matches fall into M groups by a
-// hash of the hello's seed and slot, and assign[g] (a digit) names the profile group g plays.
 func mixPick(mix string, seed int64, slot int) string {
 	parts := strings.Split(mix, "|")
 	hd := strings.Split(parts[0], ":")
@@ -465,5 +460,4 @@ func mixPick(mix string, seed int64, slot int) string {
 	return parts[1+k]
 }
 
-// MixPickX is mixPick for tools.
 func MixPickX(mix string, seed int64, slot int) string { return mixPick(mix, seed, slot) }

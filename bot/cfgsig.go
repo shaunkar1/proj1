@@ -6,10 +6,8 @@ import (
 	"sort"
 )
 
-// cfgSections are the parts of the hello compared against the published kit.
 var cfgSections = []string{"protocol", "mapfiles", "match", "bot", "mech", "vision", "sound", "weapons", "projectile", "cubes", "crates", "loot", "npc", "drops", "zone", "debug", "replay", "upgrades"}
 
-// CfgHashes gives one number per section of a hello line (canonical JSON, so key order and spacing do not matter).
 func CfgHashes(raw []byte) map[string]uint32 {
 	var h struct {
 		Protocol json.RawMessage `json:"protocol"`
@@ -40,8 +38,6 @@ func CfgHashes(raw []byte) map[string]uint32 {
 	return out
 }
 
-// cfgDiff compares a hello with the kit's: index of the first section that differs (1-based; 19 = a section the kit
-// does not have) and how many differ. 0, 0 when the hello is the kit's or was not kept.
 func cfgDiff(raw []byte) (first, n int) {
 	if len(raw) == 0 {
 		return 0, 0
@@ -71,8 +67,6 @@ func cfgDiff(raw []byte) (first, n int) {
 	return first, n
 }
 
-// CfgDiffX is cfgDiff for tools.
 func CfgDiffX(raw []byte) (int, int) { return cfgDiff(raw) }
 
-// FFASureX reports whether the bot has decided this is a free-for-all (for tools).
 func (b *Bot) FFASureX() bool { return b.ffaSure }

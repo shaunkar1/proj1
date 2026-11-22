@@ -1,5 +1,3 @@
-// Package sim is a local approximation of the mechfight/1 server, written
-// from protocol.md, for testing bots offline.
 package sim
 
 import (
@@ -23,8 +21,8 @@ type Weapon struct {
 	Reload   float64
 	Charge   float64
 	Charging bool
-	Held     float64 // time held at full charge
-	Release  bool    // released before min charge: fire when reached
+	Held     float64
+	Release  bool
 	Stats    proto.WeaponStats
 }
 
@@ -47,7 +45,7 @@ type Mech struct {
 	lastSpnd float64
 	shortTil float64
 	act      proto.Action
-	fresh    bool // first tick of the current action
+	fresh    bool
 	coast    float64
 	offers   []*proto.Offer
 	offerSet bool
@@ -70,7 +68,7 @@ type Mech struct {
 	LasShots int
 	LasHits  int
 	Hits     int
-	FirstW   float64 // time the first extra weapon was taken (-1: never)
+	FirstW   float64
 	FirstLas float64
 	Cubes60  int
 	Cubes120 int
@@ -143,7 +141,7 @@ type Proj struct {
 	Kind     string
 	Owner    int
 	Pos, Vel [3]float64
-	Left     float64 // range left (gun) or ttl (mortar)
+	Left     float64
 	Damage   float64
 	Stats    proto.WeaponStats
 	OwnerNPC bool
@@ -164,7 +162,7 @@ type Sim struct {
 	Drops                                  []*Drop
 	Projs                                  []*Proj
 	nextCube, nextPick, nextProj, nextDrop int
-	// zone
+
 	zc       [2]float64
 	zr       float64
 	znc      [2]float64
@@ -338,7 +336,6 @@ func applyWeapon(st *proto.WeaponStats, e proto.Effect) {
 	}
 }
 
-// New builds a match. ctl(i) is called once per slot after the world is set up.
 func New(w *geo.World, base *proto.Hello, seed int64, mk func(slot int, hello *proto.Hello) (Controller, string)) *Sim {
 	s := &Sim{W: w, Cfg: cloneCfg(base), Rng: rand.New(rand.NewSource(seed))}
 	s.DT = 1 / s.Cfg.Match.TickHz
@@ -348,7 +345,7 @@ func New(w *geo.World, base *proto.Hello, seed int64, mk func(slot int, hello *p
 	s.zphase = -1
 	s.advanceZone()
 	n := int(s.Cfg.Match.Mechs)
-	// spawns
+
 	var pts [][2]float64
 	sep := s.Cfg.Match.SpawnMinSeparation
 	for len(pts) < n {
@@ -526,7 +523,6 @@ func (s *Sim) stepZone() {
 
 func (s *Sim) inZone(x, y float64) bool { return hyp(x, y, s.zc[0], s.zc[1]) <= s.zr }
 
-// Give puts a weapon in slot 1 (test setups).
 func (s *Sim) Give(m *Mech, kind string) {
 	m.W[1] = &Weapon{Kind: kind, Stats: s.weaponStats(m, kind)}
 }

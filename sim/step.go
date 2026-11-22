@@ -53,12 +53,11 @@ func segCyl(a, b [3]float64, cx, cy, r, z0, z1 float64) (float64, bool) {
 }
 
 type target struct {
-	kind int // 0 mech 1 npc 2 crate
+	kind int
 	idx  int
 	t    float64
 }
 
-// firstHits returns entity hits along a→b sorted by t (only the nearest unless all).
 func (s *Sim) entityHit(a, b [3]float64, owner int, ownerNPC bool, skip map[int]bool) (target, bool) {
 	best := target{t: 2}
 	found := false
@@ -168,7 +167,6 @@ func rawStr(v string) json.RawMessage {
 	return b
 }
 
-// hurt applies weapon damage to a mech. from is the point the hit came from.
 func (s *Sim) hurt(m *Mech, amount float64, weapon string, by int, byNPC bool, from [3]float64, effect string) {
 	if !m.Alive {
 		return
@@ -1257,7 +1255,7 @@ func (s *Sim) Step() {
 	s.T = float64(s.Tick) * dt
 	if s.Alive <= 1 || s.T >= cfg.Match.DurationS {
 		s.Done = true
-		// rank survivors by HP
+
 		var surv []*Mech
 		for _, m := range s.Mechs {
 			if m.Alive {

@@ -2,7 +2,6 @@ package bot
 
 import "math"
 
-// deathSite is a place where a mech died: its cubes plus two are lying there.
 type deathSite struct {
 	pos   [2]float64
 	t     float64
@@ -16,8 +15,6 @@ type deathSite struct {
 	goT   float64
 }
 
-// heardDeath turns a death sound (bearing with a few degrees of error and a
-// coarse distance band) into a place worth visiting.
 func (b *Bot) heardDeath(brg float64, band string, at float64) {
 	me := b.me
 	px, py := me.Pos[0], me.Pos[1]
@@ -63,7 +60,6 @@ func (b *Bot) heardDeath(brg float64, band string, at float64) {
 	}
 }
 
-// snapSite moves a site onto walkable ground; false if there is none near it.
 func (b *Bot) snapSite(s *deathSite) bool {
 	nv := b.w.Nav
 	if nv.WalkableMain(s.pos[0], s.pos[1]) {
@@ -78,8 +74,6 @@ func (b *Bot) snapSite(s *deathSite) bool {
 	return true
 }
 
-// tidySites drops sites that are stale, already looked at, or whose cubes we can see
-// (visible cubes are ordinary objectives).
 func (b *Bot) tidySites() {
 	if len(b.sites) == 0 {
 		return

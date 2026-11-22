@@ -1,4 +1,3 @@
-// Command bot speaks mechfight/1 on stdin/stdout.
 package main
 
 import (

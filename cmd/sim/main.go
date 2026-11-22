@@ -1,4 +1,3 @@
-// Command sim plays local matches and reports placement statistics.
 package main
 
 import (

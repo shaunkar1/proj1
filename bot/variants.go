@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// Variant returns a named parameter set (for A/B runs in the simulator).
 func Variant(name string) Params {
 	p := DefaultParams()
 	p.Name = name

@@ -6,16 +6,13 @@ import (
 	"mechbot/proto"
 )
 
-const latency = 0.06 // s between observing and the shot leaving
+const latency = 0.06
 
-// histAt returns the i-th most recent history record (0 = newest).
 func (t *Track) histAt(i int) *histRec {
 	n := len(t.hist)
 	return &t.hist[((t.hn-1-i)%n+n)%n]
 }
 
-// predVel is predictor k's velocity estimate using history up to `back`
-// samples ago (0 = now).
 func (t *Track) predVel(k, back int) (float64, float64) {
 	cur := t.histAt(back)
 	avg := func(span int) (float64, float64) {
@@ -49,8 +46,6 @@ func (t *Track) predVel(k, back int) (float64, float64) {
 	return cur.vel[0], cur.vel[1]
 }
 
-// scorePredictors replays the last second: which way of extrapolating this
-// mech would have put a round on it most often at the current flight time?
 func (b *Bot) scorePredictors(t *Track) {
 	n := t.hn
 	if n > len(t.hist) {
@@ -104,7 +99,6 @@ func (b *Bot) scorePredictors(t *Track) {
 	t.pred = best
 }
 
-// predict returns the target's centre after dt seconds.
 func (b *Bot) predict(t *Track, dt float64) [3]float64 {
 	c := t.Center()
 	c[0] += t.aimOff[0]
@@ -135,7 +129,6 @@ func (b *Bot) aimAt(p [3]float64) (yaw, pitch, d float64) {
 	return math.Atan2(dy, dx), math.Atan2(dz, h), math.Sqrt(h*h + dz*dz)
 }
 
-// gunSolve leads the target with a constant-speed projectile.
 func (b *Bot) gunSolve(t *Track, speed float64) (yaw, pitch, tof float64, pt [3]float64) {
 	tof = dist3(b.muz, t.Center()) / speed
 	for i := 0; i < 3; i++ {
@@ -161,7 +154,6 @@ func ballistic(v, g, d, h float64) (theta, tof float64, ok bool) {
 	return theta, tof, true
 }
 
-// mortarSolve aims a shell at the target's predicted feet.
 func (b *Bot) mortarSolve(t *Track, st *proto.WeaponStats) (yaw, pitch, tof float64, ok bool) {
 	tube := [3]float64{b.me.Pos[0], b.me.Pos[1], b.me.Pos[2] + b.me.Stats.Height + 0.5}
 	tof = hyp(tube[0], tube[1], t.Pos[0], t.Pos[1]) / st.Speed
@@ -194,7 +186,6 @@ func (b *Bot) mortarSolve(t *Track, st *proto.WeaponStats) (yaw, pitch, tof floa
 	return yaw, pitch, tof, true
 }
 
-// aimNext estimates the torso aim one tick after commanding cmd.
 func (b *Bot) aimNext(cmd [2]float64, ticks float64) [2]float64 {
 	a := b.me.Aim
 	dt := ticks / b.cfg.Match.TickHz
@@ -207,8 +198,6 @@ func aimErr(a [2]float64, yaw, pitch float64) (float64, float64) {
 	return math.Abs(angDiff(a[0], yaw)), math.Abs(a[1] - pitch)
 }
 
-// shootMech commands aim and triggers against a mech (or NPC) target.
-// Returns true if any weapon has a shot (now or imminently).
 func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	me := b.me
 	c := t.Center()
@@ -322,7 +311,6 @@ func (b *Bot) shootMech(act *proto.Action, t *Track) bool {
 	return shot
 }
 
-// shootCrate fires the gun at a crate.
 func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 	p := [3]float64{it.Pos[0], it.Pos[1], it.Pos[2] + 1.2}
 	y, pi, d := b.aimAt(p)
@@ -356,10 +344,6 @@ func (b *Bot) shootCrate(act *proto.Action, it *Item) bool {
 	return true
 }
 
-// laserPoint picks where on a mech to put the beam: its centre when the line
-// from our muzzle is open, otherwise a higher or lower part that is. The eye
-// seeing the target does not mean the muzzle has a line (ridges, roof edges,
-// and a muzzle that rises as we grow).
 func (b *Bot) laserPoint(t *Track, hgt float64) (pt [3]float64, ok, tight bool) {
 	pt = b.predict(t, latency)
 	if b.P.NoLasCheck || b.w.Clear(b.muz[0], b.muz[1], b.muz[2], pt[0], pt[1], pt[2]) {
@@ -375,9 +359,6 @@ func (b *Bot) laserPoint(t *Track, hgt float64) (pt [3]float64, ok, tight bool) 
 	return pt, false, false
 }
 
-// chaserClose: a lightning carrier closing inside the distance it can cover
-// while we stand at half speed charging. Starting a charge there walks us into
-// its arc (which also shorts the laser); the gun keeps us at full speed.
 func (b *Bot) chaserClose(t *Track, d float64) bool {
 	if b.P.NoChaserRule || !t.has[3] || d > 68 || d < 46 {
 		return false

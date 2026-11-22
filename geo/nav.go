@@ -7,19 +7,18 @@ import (
 
 const NavStep = 2.0
 
-// Nav is a ground-level walkability grid (2 m cells) with A* search.
 type Nav struct {
 	W, H   int
 	MinX   float64
 	MinY   float64
 	Walk   []bool
-	Hgt    []float32        // walking surface height
-	Cost   []float32        // extra cost for hugging obstacles
-	Open   []float32        // metres to the nearest tall building
-	Adj    []uint8          // bit k set: the step to neighbour k is walkable
-	Comp   []int32          // connected component id (-1 blocked)
-	Main   int32            // id of the largest component
-	Exits  map[int32][]Exit // ways out of enclosed areas, by component
+	Hgt    []float32
+	Cost   []float32
+	Open   []float32
+	Adj    []uint8
+	Comp   []int32
+	Main   int32
+	Exits  map[int32][]Exit
 	g      []float32
 	stamp  []uint32
 	closed []uint32
@@ -269,7 +268,6 @@ func (nv *Nav) neighbors(c int, f func(nc int, cost float32)) {
 	}
 }
 
-// stepOK reports whether moving from cell a to the adjacent cell b is walkable.
 func (nv *Nav) stepOK(a, b int) bool {
 	d := b - a
 	for k := 0; k < 8; k++ {
@@ -280,14 +278,12 @@ func (nv *Nav) stepOK(a, b int) bool {
 	return false
 }
 
-// Exit is a jet hop out of an enclosed area: stand at L, rise above H, fly to T.
 type Exit struct {
 	LX, LY, TX, TY float64
-	H              float64 // altitude to clear
-	Energy         float64 // rough energy cost
+	H              float64
+	Energy         float64
 }
 
-// MaxTopAlong returns the highest surface (terrain or prism) on the segment.
 func (w *World) MaxTopAlong(ax, ay, bx, by float64) float64 {
 	l := math.Hypot(bx-ax, by-ay)
 	n := int(l) + 1
@@ -301,7 +297,6 @@ func (w *World) MaxTopAlong(ax, ay, bx, by float64) float64 {
 	return m
 }
 
-// buildExits finds jet hops from every enclosed walkable pocket to open ground.
 func (w *World) buildExits(jetDrain, riseSpeed, maxEnergy float64) {
 	nv := w.Nav
 	nv.Exits = map[int32][]Exit{}
@@ -365,8 +360,6 @@ func (w *World) buildExits(jetDrain, riseSpeed, maxEnergy float64) {
 	}
 }
 
-// NearestIn returns the closest walkable cell of component comp (any
-// component if comp < 0) within maxR metres, or -1.
 func (nv *Nav) NearestIn(x, y, maxR float64, comp int32) int {
 	ok := func(c int) bool { return nv.Walk[c] && (comp < 0 || nv.Comp[c] == comp) }
 	c := nv.Cell(x, y)
@@ -424,13 +417,11 @@ func (nv *Nav) Walkable(x, y float64) bool {
 	return c >= 0 && nv.Walk[c]
 }
 
-// WalkableMain: walkable and part of the main connected area.
 func (nv *Nav) WalkableMain(x, y float64) bool {
 	c := nv.Cell(x, y)
 	return c >= 0 && nv.Walk[c] && nv.Comp[c] == nv.Main
 }
 
-// Nearest returns the closest main-component walkable cell within maxR metres, or -1.
 func (nv *Nav) Nearest(x, y, maxR float64) int {
 	c := nv.Cell(x, y)
 	if c >= 0 && nv.Walk[c] && nv.Comp[c] == nv.Main {
@@ -469,7 +460,6 @@ func (nv *Nav) Nearest(x, y, maxR float64) int {
 	return best
 }
 
-// WalkLine reports whether the straight segment stays on walkable cells.
 func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 	dx, dy := bx-ax, by-ay
 	l := math.Hypot(dx, dy)
@@ -489,9 +479,6 @@ func (nv *Nav) WalkLine(ax, ay, bx, by float64) bool {
 	return true
 }
 
-// Path runs A* from (sx,sy) to (gx,gy). Returns waypoints from start to goal
-// (cell centres) and the path cost in metres; nil if unreachable.
-// extra, if non-nil, adds a per-cell cost (danger fields).
 func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) float32) ([][2]float64, float64) {
 
 	s := nv.NearestIn(sx, sy, 6, -1)
@@ -584,8 +571,6 @@ func (nv *Nav) Path(sx, sy, gx, gy float64, maxExpand int, extra func(c int) flo
 	return out, float64(nv.g[g]) * NavStep
 }
 
-// CloneScratch returns a World sharing all static data but with its own
-// search scratch space, so several goroutines can path-find at once.
 func (w *World) CloneScratch() *World {
 	c := *w
 	nv := *w.Nav
