@@ -727,6 +727,17 @@ func (b *Bot) decide(act *proto.Action) {
 		} else if b.P.PracEarlyHP > 0 {
 			retreatHP = b.P.PracEarlyHP
 		}
+		if b.P.PracStandN > 0 && nHostile >= b.P.PracStandN && tgt != nil {
+			shp := b.P.PracStandHP
+			if shp <= 0 {
+				shp = 0.6
+			}
+			if hpFrac > shp {
+
+				engage = true
+				retreatHP = 0
+			}
+		}
 	}
 	finishing := tgt != nil && myTTK < 1.6
 	if !b.retreating {
