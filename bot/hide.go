@@ -123,6 +123,14 @@ func (b *Bot) hideSpot() [2]float64 {
 	px, py := me.Pos[0], me.Pos[1]
 	nv := b.w.Nav
 	zs := b.zoneAt(b.t + 25)
+	if b.P.HideNext > 0 && b.ffaSure && !b.practice {
+
+		if zn := b.zoneAt(b.o.Zone.ShrinkEnd + 0.01); zn.r > 0 && zn.r < zs.r {
+			if m := math.Min(b.P.HideNext, zn.r*0.5); zn.r > 2*m {
+				zs = zoneC{zn.c, zn.r - m + 12}
+			}
+		}
+	}
 	h := me.Stats.Height
 
 	if b.P.HideCorner > 0 {

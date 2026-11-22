@@ -150,6 +150,7 @@ type Params struct {
 	ZoneStallE      float64
 	ZoneGoalNear    bool
 	Unwedge         bool
+	HideNext        float64
 	ZoneRun         float64
 	ZoneRunStall    float64
 	HushT           float64
@@ -174,6 +175,10 @@ type Params struct {
 	PracDrop        float64
 	PracDropD       float64
 
+	PracMoveAfter   float64
+	PracMoveT       float64
+	PracStandN      int
+	PracStandHP     float64
 	PracLateT       float64
 	PracEarlyHP     float64
 	PracKS          float64
@@ -261,6 +266,18 @@ type Params struct {
 	SilentCollect  float64
 	SilentClear    float64
 	LaserErrand    float64
+
+	LasRush    float64
+	LasSafe    float64
+	LasWait    bool
+	GlLaser    bool
+	GlHP       float64
+	GlHurt     float64
+	GlBusy     bool
+	GlCubes    int
+	CorpseD    float64
+	CorpseAge  float64
+	CorpseSafe float64
 }
 
 func DefaultParams() Params {
@@ -405,6 +422,8 @@ type Bot struct {
 
 	targetID      int
 	retreating    bool
+	killAt        [2]float64
+	killAtT       float64
 	lastDmgT      float64
 	quietWalkN    int
 	lastDmgBy     int
@@ -565,6 +584,7 @@ type Bot struct {
 	hardC    map[int]float64
 	zrOn     int
 	x10      x10state
+	h20      h20state
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {
@@ -885,6 +905,7 @@ func (b *Bot) perceive(o *proto.Obs) {
 			}
 		case "kill":
 			b.kills++
+			b.killAt, b.killAtT = [2]float64{o.Self.Pos[0], o.Self.Pos[1]}, o.T
 			delete(b.tracks, e.Target)
 			delete(b.x10.mem, e.Target)
 			if b.targetID == e.Target {

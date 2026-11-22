@@ -116,6 +116,22 @@ func ApplyProfile(p *Params, name string) {
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracDropCrowd = v2
 				}
+			case len(m) > 2 && m[:2] == "mv":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracMoveAfter = v2
+				}
+			case len(m) > 2 && m[:2] == "mt":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracMoveT = v2
+				}
+			case len(m) > 2 && m[:2] == "rb":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracStandN = int(v2)
+				}
+			case len(m) > 2 && m[:2] == "sh":
+				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
+					p.PracStandHP = v2 / 100
+				}
 			case len(m) > 2 && m[:2] == "la":
 				if v2, err := strconv.ParseFloat(m[2:], 64); err == nil {
 					p.PracLateT = v2

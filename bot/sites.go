@@ -52,6 +52,10 @@ func (b *Bot) heardDeath(brg float64, band string, at float64) {
 		s.pos = [2]float64{px + math.Cos(brg)*d, py + math.Sin(brg)*d}
 	}
 	b.x10Death(s, band)
+	if s.exact && who != nil {
+
+		b.corpseDeath(who.ID, s.pos[0], s.pos[1], at)
+	}
 	if !b.snapSite(s) {
 		return
 	}
