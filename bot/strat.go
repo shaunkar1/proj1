@@ -2293,7 +2293,11 @@ func (b *Bot) lateStrike(t *Track, d, hpFrac float64) bool {
 
 		ux, uy := (b.me.Pos[0]-t.Pos[0])/d, (b.me.Pos[1]-t.Pos[1])/d
 		if t.AvgVel[0]*ux+t.AvgVel[1]*uy >= b.P.LateApproach {
-			hpLim, ratioLim = 1.35, math.Max(ratioLim, 1.5)
+			ar := 1.5
+			if b.P.LateApproachR > 0 {
+				ar = b.P.LateApproachR
+			}
+			hpLim, ratioLim = 1.35, math.Max(ratioLim, ar)
 		}
 	}
 	if t.HP > hpLim*b.me.HP || b.dangerRatio(t) > ratioLim {
