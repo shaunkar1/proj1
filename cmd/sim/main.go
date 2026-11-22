@@ -117,6 +117,9 @@ func main() {
 	loot := flag.Bool("loot", false, "duel: keep loot, crates, NPCs")
 	dump := flag.String("dump", "", "practice: write the candidate's hello and observations of the first match here")
 	trace := flag.String("trace", "", "write a trace of the first match to this file")
+	statsF := flag.String("stats", "", "ffa: write one JSON line per match (results; with -statpos also hits and 1 Hz positions)")
+	statPos := flag.Bool("statpos", false, "ffa: include hits and positions in -stats")
+	mlines := flag.Bool("mlines", false, "ffa: print one '#M {json}' line per match (results, openings, per-mech measurements)")
 	flag.Parse()
 
 	house.Levels[0].AimNoise = *easyNoise
@@ -129,6 +132,16 @@ func main() {
 	w0.SetMargin(base.Config.Match.ArenaMargin)
 	w0.BuildNav(3.0, 9.5, 1.2)
 	cands := strings.Split(*cand, ",")
+	var statW *bufio.Writer
+	if *statsF != "" {
+		f, err := os.Create(*statsF)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		statW = bufio.NewWriterSize(f, 1<<20)
+		defer statW.Flush()
+	}
 
 	var mu sync.Mutex
 	res := map[string][]result{}
@@ -141,6 +154,7 @@ func main() {
 			w := w0.CloneScratch()
 			for sd := range jobs {
 				var tm []*timed
+				var posLog [][]samp
 				var dumpW *bufio.Writer
 				var exts []*sim.ExtBot
 				names := map[int]string{}
@@ -283,6 +297,13 @@ func main() {
 					for !s.Done && s.Mechs[mySlot].Alive {
 						s.Step()
 					}
+				} else if statW != nil || *mlines {
+					for !s.Done {
+						if s.Tick%20 == 0 {
+							posLog = append(posLog, sample(s))
+						}
+						s.Step()
+					}
 				} else {
 					s.Run()
 				}
@@ -299,6 +320,47 @@ func main() {
 					f.Close()
 				}
 				mu.Lock()
+				if statW != nil || *mlines {
+					ms, engs, hits := matchStats(s, names, posLog)
+					out := map[string]interface{}{"seed": sd, "mechs": ms, "eng": engs, "len": math.Round(s.T*10) / 10}
+					if *mlines {
+
+						b01 := func(v bool) int {
+							if v {
+								return 1
+							}
+							return 0
+						}
+						var cm, ce [][]interface{}
+						for _, m := range ms {
+							cm = append(cm, []interface{}{m.Name, m.Place, m.Kills, m.DeathT, b01(m.Alive), m.Cubes, m.C60, m.C120, m.C180, m.Dealt, m.Taken, m.By, m.With, m.Loadout, m.FH, m.FD, m.Still, m.Las, m.KC, m.AD})
+						}
+						for _, e := range engs {
+							ce = append(ce, []interface{}{e.T, e.A, e.B, e.D, e.ClA, e.ClB, b01(e.Near), e.NC, b01(e.Weak), b01(e.Few), e.MC, e.TC, e.NAlive})
+						}
+						jb, _ := json.Marshal(map[string]interface{}{"seed": sd, "m": cm, "e": ce})
+						fmt.Printf("#M %s\n", jb)
+					}
+					if statW != nil {
+						if *statPos {
+							var pl [][]int
+							for _, row := range posLog {
+								var r []int
+								for i, m := range row {
+									if m.alive {
+										r = append(r, i, int(math.Round(m.x)), int(math.Round(m.y)), int(m.hp), m.cubes, int(m.maxhp))
+									}
+								}
+								pl = append(pl, r)
+							}
+							out["hits"] = hits
+							out["pos"] = pl
+						}
+						jb, _ := json.Marshal(out)
+						statW.Write(jb)
+						statW.WriteByte('\n')
+					}
+				}
 				ti := 0
 				for _, m := range s.Mechs {
 					nm, ok := names[m.ID]

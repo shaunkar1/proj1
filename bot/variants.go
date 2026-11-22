@@ -528,6 +528,21 @@ func Variant(name string) Params {
 	case "ls3":
 		p.FFA0 = "always"
 		p.LateStrike = 3
+	case "s3":
+		p.FFA0 = "always"
+		p.LateStrike = 3
+		p.LateStrikeRatio = 0.85
+	case "s4":
+		p.FFA0 = "always"
+		p.LateStrike = 4
+		p.LateStrikeRatio = 0.85
+	case "s5":
+		p.FFA0 = "always"
+		p.LateStrike = 5
+		p.LateStrikeRatio = 0.85
+	case "el4":
+		p.FFA0 = "always"
+		p.EndLow = 4
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
@@ -809,6 +824,106 @@ func Variant(name string) Params {
 		p.WeaponRank = map[string]float64{"lightning": 3, "laser": 2, "mortar": 1, "gun": 0.5}
 	case "r60":
 		p.PrefRangeGun = 60
+
+	case "hunterA", "hunterA2":
+
+		fieldBase(&p)
+		p.Aggressive = true
+		p.AggroHP = 0.6
+		p.HuntAfter = 12
+		p.EngageRatio = 1.3
+		p.RetreatHP = 0.3
+		p.ReengageHP = 0.7
+		p.ChaseHP, p.ChaseD = 0.6, 55
+		p.SiteFarVal = 120
+		p.Camp, p.CampDuty, p.CampD = true, 0.4, 50
+		if name == "hunterA2" {
+			p.EngageRatio = 1.6
+			p.RetreatHP = 0.2
+			p.AggroHP = 0.5
+		}
+	case "hunterX", "hunterX2":
+
+		fieldBase(&p)
+		p.BossRatio = 2.0
+		p.FFADrop = 0.6
+		p.EvadeSniper = true
+		p.PreyRatio = 1.15
+		p.HuntAfter = 12
+		p.EngageRatio = 1.2
+		p.RetreatHP = 0.35
+		p.ChaseHP, p.ChaseD = 0.6, 55
+		p.SiteFarVal = 120
+		p.Camp, p.CampDuty, p.CampD = true, 0.4, 50
+		if name == "hunterX2" {
+			p.PreyRatio = 1.5
+			p.OpenRatio = 2.0
+		}
+	case "hunterB", "hunterB2":
+
+		fieldBase(&p)
+		p.Aggressive = true
+		p.AggroD = 170
+		p.HuntAfter = 12
+		p.EngageRatio = 1.6
+		p.RetreatHP = 0.15
+		p.ReengageHP = 0.6
+		p.FixRange = 110
+		p.Ambush, p.AmbushAng, p.AmbushRatio = 220, 1.4, 3
+		p.Snipe = 265
+		p.Camp, p.CampDuty, p.CampD = true, 0.35, 50
+		if name == "hunterB2" {
+			p.EngageRatio = 1e9
+			p.RetreatHP = 0
+			p.NoPeek = true
+		}
+	case "brawl", "brawl2":
+
+		fieldBase(&p)
+		p.Aggressive = true
+		p.AggroD = 60
+		p.HuntPassive = false
+		p.EngageRatio = 1e9
+		p.RetreatHP = 0
+		p.FixRange = 50
+		p.NoPeek = true
+		p.Camp, p.CampDuty, p.CampD = true, 0.55, 40
+		p.NoExplore = true
+		p.Open = false
+		p.Sites = false
+		p.PileBonus = 0
+		if name == "brawl2" {
+			p.FarmNPC = false
+		}
+	case "hideR":
+
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.FarmNPC = false
+		p.Open = false
+		p.HuntPassive = false
+		p.EndLow = 0
+		p.Camp, p.CampDuty, p.CampD = true, 0.5, 40
+	case "campR", "campR2":
+
+		fieldBase(&p)
+		p.Aggressive = true
+		p.AggroD = 45
+		p.HuntPassive = false
+		p.Camp, p.CampDuty, p.CampD = true, 0.6, 40
+		p.NoExplore = true
+		p.FarmNPC = false
+		p.Open = false
+		p.Sites = false
+		p.EngageRatio = 1.2
+		p.RetreatHP = 0.3
+		p.NoPeek = true
+		p.WeaponRank = map[string]float64{"lightning": 0, "laser": 0, "mortar": 0, "gun": 0.5}
+		if name == "campR2" {
+			p.EngageRatio = 1e9
+			p.RetreatHP = 0
+		}
 	case "aggro":
 		p.Aggressive = true
 	case "passive":

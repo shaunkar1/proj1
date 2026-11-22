@@ -994,11 +994,16 @@ func (b *Bot) decide(act *proto.Action) {
 			if me.Energy > 75 && hyp(goal[0], goal[1], px, py) > 40 && ob.kind != "roof" {
 				ctx.boost = true
 			}
+		} else if b.campPhase() {
+			mode = "camp"
+			goal, hasGoal = [2]float64{px, py}, true
+			ctx.arrive = 6
 		} else {
 			goal, hasGoal = b.roam(zEnd), true
 			ctx.arrive = 6
 		}
 	}
+	b.campHold = mode == "camp"
 	b.mode = mode
 	if b.E.Watchdog && !b.practice {
 
@@ -1445,7 +1450,7 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 	if b.t < t.Hostile {
 		return true
 	}
-	if b.P.Aggressive {
+	if b.P.Aggressive && (b.P.AggroD <= 0 || d < b.P.AggroD) && b.t >= b.P.AggroAfter && hpFrac >= b.P.AggroHP {
 		return true
 	}
 	if b.isPrey(t, d, hpFrac) {
@@ -1646,6 +1651,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 	}
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
+		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() {
+			return
+		}
 		for _, t := range keep {
 			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {

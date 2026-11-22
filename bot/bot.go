@@ -12,6 +12,13 @@ import (
 )
 
 type Params struct {
+	AggroD     float64
+	AggroAfter float64
+	AggroHP    float64
+	Camp       bool
+	CampD      float64
+	CampDuty   float64
+
 	Name            string
 	EngageRatio     float64
 	RetreatHP       float64
@@ -329,6 +336,7 @@ type Bot struct {
 	scanPhase     float64
 	lasHold       bool
 	cmdAim        [2]float64
+	campHold      bool
 	kills         int
 	othersDied    int
 	prevAlive     int
@@ -812,6 +820,7 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 	if o.Tick <= 1 && b.cmdAim == ([2]float64{}) {
 		act.Aim = o.Self.Aim
 	}
+	b.campHold = false
 	b.decide(&act)
 	if b.P.MoveJit != 0 && !b.ffaSure && (act.Move[0] != 0 || act.Move[1] != 0) {
 
@@ -825,9 +834,10 @@ func (b *Bot) Act(o *proto.Obs) proto.Action {
 		c, s := math.Cos(a), math.Sin(a)
 		act.Move = proto.Vec2{act.Move[0]*c - act.Move[1]*s, act.Move[0]*s + act.Move[1]*c}
 	}
-	if b.P.Still {
+	if b.P.Still || (b.campHold && b.P.Camp) {
 		act.Move = proto.Vec2{}
 		act.Jump = false
+		act.Boost = false
 	}
 	if b.P.NoFire {
 		act.Fire = [2]bool{}
