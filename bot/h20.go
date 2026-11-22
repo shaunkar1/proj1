@@ -11,7 +11,7 @@ func (b *Bot) h20On() bool { return b.ffaSure && !b.practice }
 type h20state struct {
 	corpses []corpseHeap
 
-	n    [24]int
+	n    [27]int
 	seen map[int]bool
 }
 
@@ -36,6 +36,7 @@ const (
 	hLasGo
 	hLasUnsafe
 	hLasWait
+	hLasWaitD
 	hGlGo
 	hGlHurt
 	hGlBusy
@@ -46,17 +47,19 @@ const (
 	hCorpseUnsafe
 	hCorpseAge
 	hCorpseTook
+	hDuelTrack
+	hDuelZone
 	hDecide
 )
 
 var H20Debug = os.Getenv("MECH_H20") != ""
 
 func (b *Bot) lasRushOn() bool {
-	return b.P.LasRush != 0 && b.h20On() && !b.holds("laser")
+	return b.P.LasRush != 0 && b.h20On() && !b.holds("laser") && (b.P.LasRushT <= 0 || b.t < b.P.LasRushT)
 }
 
 func (b *Bot) lasActive() bool {
-	return b.P.LasRush > 0 && b.h20On() && !b.holds("laser")
+	return b.P.LasRush > 0 && b.h20On() && !b.holds("laser") && (b.P.LasRushT <= 0 || b.t < b.P.LasRushT)
 }
 
 func lasObj(ob *objective) bool {
@@ -108,6 +111,7 @@ func (b *Bot) lasWaiting() bool {
 	if !b.P.LasWait || !b.lasActive() {
 		return false
 	}
+	blocked := false
 	for _, it := range b.pickupL {
 		if it.Kind != "laser" || b.t < it.Bad {
 			continue
@@ -116,11 +120,12 @@ func (b *Bot) lasWaiting() bool {
 			continue
 		}
 		ob := objective{kind: "weapon", pos: it.Pos, item: it}
-		if !b.lasSafe(&ob) {
-			return true
+		if b.lasSafe(&ob) {
+			return false
 		}
+		blocked = true
 	}
-	return false
+	return blocked
 }
 
 func (b *Bot) greenLight(t *Track, d, hpFrac float64) bool {
@@ -206,6 +211,17 @@ func (b *Bot) corpseFree(ob *objective) bool {
 	default:
 		return false
 	}
+
+	if ob.kind == "site" && ob.site != nil && !ob.site.far {
+		if b.t-ob.site.t < b.P.CorpseAge {
+			b.h20.n[hCorpseAge]++
+		} else if b.P.CorpseSafe > 0 && b.lasNear(ob.pos[0], ob.pos[1]) < b.P.CorpseSafe {
+			b.h20.n[hCorpseUnsafe]++
+		} else {
+			b.h20.n[hCorpseGo]++
+			return true
+		}
+	}
 	for i := range b.h20.corpses {
 		c := &b.h20.corpses[i]
 		if hyp(ob.pos[0], ob.pos[1], c.pos[0], c.pos[1]) > 25 {
@@ -234,6 +250,37 @@ func (b *Bot) corpseBonus(ob *objective) float64 {
 		return 150
 	}
 	return 0
+}
+
+func (b *Bot) duelAim() (float64, bool) {
+	if !b.P.DuelHold || !b.h20On() || b.o.Alive != 2 || b.othersDied == 0 {
+		return 0, false
+	}
+	if math.Hypot(b.me.Vel[0], b.me.Vel[1]) > 1.0 {
+		return 0, false
+	}
+	px, py := b.me.Pos[0], b.me.Pos[1]
+	mem := b.P.DuelMem
+	if mem <= 0 {
+		mem = 25
+	}
+	for _, t := range b.trackL {
+		if t.NPC || b.t-t.Seen > mem {
+			continue
+		}
+		b.h20.n[hDuelTrack]++
+		return math.Atan2(t.Pos[1]-py, t.Pos[0]-px), true
+	}
+	z := &b.o.Zone
+	cx, cy := z.NextCenter[0], z.NextCenter[1]
+	if hyp(cx, cy, px, py) < 15 {
+		cx, cy = z.Center[0], z.Center[1]
+	}
+	if hyp(cx, cy, px, py) < 15 {
+		return 0, false
+	}
+	b.h20.n[hDuelZone]++
+	return math.Atan2(cy-py, cx-px), true
 }
 
 func (b *Bot) h20Trace() {
