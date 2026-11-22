@@ -791,6 +791,13 @@ func (b *Bot) decide(act *proto.Action) {
 			// wounded and alone: stay on it so it cannot break off and repair
 			prefD = b.P.ChaseD
 		}
+		if b.P.QuietNoClose && b.ffaSure && b.quiet && !b.practice && !finishing && tgt.HP > 0.3*tgt.MaxHP {
+			// recorded matches (521 first-hit victims): closing on the attacker in the next 5 s -> 43% dead within
+			// 20 s and place 9.2; opening the gap -> 28% and 7.8, in every distance / HP / laser stratum
+			if dNow := hyp(px, py, tgt.Pos[0], tgt.Pos[1]); dNow > prefD {
+				prefD = math.Min(dNow+10, 190)
+			}
+		}
 		ctx.pref = prefD
 		for i := range threats {
 			if threats[i].t == tgt {
@@ -801,6 +808,15 @@ func (b *Bot) decide(act *proto.Action) {
 			goal, hasGoal = [2]float64{tgt.Pos[0], tgt.Pos[1]}, true
 			ctx.arrive = math.Max(8, ctx.pref*0.6)
 			ctx.wGoal = 0.8
+			if b.P.QuietNoChase && b.ffaSure && b.quiet && !b.practice && !finishing && tgt.HP > 0.3*tgt.MaxHP {
+				// replays of our first-hit events: a third of the decisions walked to the attacker's last position
+				goal, hasGoal = b.findSafe(threats), true
+				ctx.arrive = 1.5
+				ctx.hide = true
+				ctx.wantLOS = 0
+				ctx.strafe = false
+				ctx.wGoal = 1.5
+			}
 		}
 		d := hyp(px, py, tgt.Pos[0], tgt.Pos[1])
 		if b.P.LtnKite && tgt.has[3] && !b.holds("lightning") {
@@ -1493,6 +1509,20 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 				break
 			}
 		}
+		if ok && b.P.SafeAway > 0 && b.ffaSure && !b.practice {
+			for i := range threats {
+				th := &threats[i]
+				if th.t.NPC || th.weight < 1 {
+					continue
+				}
+				dNow := hyp(px, py, th.t.Pos[0], th.t.Pos[1])
+				dS := hyp(b.safeSpot[0], b.safeSpot[1], th.t.Pos[0], th.t.Pos[1])
+				if dS < dNow-10 && hyp(b.safeSpot[0], b.safeSpot[1], px, py) > 12 {
+					ok = false
+					break
+				}
+			}
+		}
 		if ok && b.zoneAt(b.t+8).outside(b.safeSpot[0], b.safeSpot[1]) < -4 {
 			return b.safeSpot
 		}
@@ -1523,6 +1553,16 @@ func (b *Bot) findSafe(threats []threat) [2]float64 {
 				s -= 150 * th.weight
 			}
 			s += math.Min(d, 120) * 0.5 * th.weight
+			if b.P.SafeAway > 0 && b.ffaSure && !b.practice && th.weight >= 1 {
+				// beyond 120 m the line above no longer cares: cover 60 m toward a sniper scored like cover 60 m away;
+				// and cover on the far side of the attacker is no cover we can reach
+				dNow := hyp(px, py, th.t.Pos[0], th.t.Pos[1])
+				if d < dNow-10 {
+					s -= 120 + b.P.SafeAway*(dNow-d)
+				} else if hyp(x, y, px, py) > dNow && (x-px)*(th.t.Pos[0]-px)+(y-py)*(th.t.Pos[1]-py) > 0 {
+					s -= 120 // beyond it, in its direction
+				}
+			}
 			// do not run through the enemy
 			if d < 30 {
 				s -= 100
