@@ -344,6 +344,21 @@ func Variant(name string) Params {
 	case "nofl":
 		p.FFA0 = "always"
 		p.FleeLaser = 0
+	case "nch":
+		p.FFA0 = "always"
+		p.QuietNoChase = true
+	case "sa":
+		p.FFA0 = "always"
+		p.SafeAway = 1.0
+	case "nchsa":
+		p.FFA0 = "always"
+		p.QuietNoChase = true
+		p.SafeAway = 1.0
+	case "all3":
+		p.FFA0 = "always"
+		p.QuietNoChase = true
+		p.SafeAway = 1.0
+		p.QuietNoClose = true
 	case "ffa0old":
 		p.FFA0 = "always"
 		p.EndgameFFA, p.QuietCap = 0, 240
