@@ -543,6 +543,31 @@ func Variant(name string) Params {
 	case "el4":
 		p.FFA0 = "always"
 		p.EndLow = 4
+	case "el10":
+		p.FFA0 = "always"
+		p.EndLow = 10
+	case "el16":
+		p.FFA0 = "always"
+		p.EndLow = 16
+	case "hd0":
+		p.FFA0 = "always"
+		p.Camp, p.CampDuty, p.CampD = true, 0, 40
+	case "hd1":
+		p.FFA0 = "always"
+		p.Camp, p.CampDuty, p.CampD = true, 0.5, 40
+	case "hd2":
+		p.FFA0 = "always"
+		p.FarmNPC = false
+		p.Open = false
+		p.HuntPassive = false
+	case "hd3":
+		p.FFA0 = "always"
+		p.QuietAlive = 3
+		p.QuietCap = 420
+		p.FarmNPC = false
+		p.Open = false
+		p.HuntPassive = false
+		p.Camp, p.CampDuty, p.CampD = true, 0.5, 40
 	case "noel":
 		p.FFA0 = "always"
 		p.EndLow = 0
