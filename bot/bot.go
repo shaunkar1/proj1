@@ -263,6 +263,18 @@ type Params struct {
 	SilentCollect  float64
 	SilentClear    float64
 	LaserErrand    float64
+
+	LasRush    float64
+	LasSafe    float64
+	LasWait    bool
+	GlLaser    bool
+	GlHP       float64
+	GlHurt     float64
+	GlBusy     bool
+	GlCubes    int
+	CorpseD    float64
+	CorpseAge  float64
+	CorpseSafe float64
 }
 
 func DefaultParams() Params {
@@ -567,6 +579,7 @@ type Bot struct {
 	hardC    map[int]float64
 	zrOn     int
 	x10      x10state
+	h20      h20state
 }
 
 func New(h *proto.Hello, w *geo.World, p Params) *Bot {

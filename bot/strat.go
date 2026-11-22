@@ -1883,6 +1883,7 @@ func (b *Bot) decide(act *proto.Action) {
 	b.e8Trace()
 	b.trace13(act, mode, goal, hasGoal, zoneGo, zoneUrgent, budget, needIn, tgt)
 	b.x10Trace(zoneUrgent, act, farmShot)
+	b.h20Trace()
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
 	}
@@ -1928,6 +1929,11 @@ func (b *Bot) fair(t *Track, d, hpFrac float64) bool {
 		return true
 	}
 	if b.isOpening(t, d, hpFrac) {
+		t.Hostile = math.Max(t.Hostile, b.t+8)
+		return true
+	}
+	if b.greenLight(t, d, hpFrac) {
+
 		t.Hostile = math.Max(t.Hostile, b.t+8)
 		return true
 	}
@@ -2126,13 +2132,34 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			}
 		}
 	}
+
+	lasWait := b.lasWaiting()
 	consider := func(ob objective) {
 		d := b.roughDist(ob.pos[0], ob.pos[1])
-		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() && ob.kind != "ear" {
+		lasWant := b.lasWant(&ob, d)
+		lasGo := false
+		if lasWant {
+			b.h20.n[hLasSeen]++
+			if lasGo = b.lasSafe(&ob); !lasGo {
+				b.h20.n[hLasUnsafe]++
+			} else {
+				b.h20.n[hLasGo]++
+			}
+		}
+		if lasWait && !lasGo {
+			b.h20.n[hLasWait]++
 			return
 		}
+		if b.P.CampD > 0 && d > b.P.CampD && b.campPhase() && ob.kind != "ear" {
+			if b.lasSkip(lasWant, lasGo, hGateOther) {
+				return
+			}
+		}
 		if b.x10Skip(&ob, d) {
-			return
+
+			if b.lasSkip(lasWant, lasGo, hGateOther) {
+				return
+			}
 		}
 		if b.practice && b.P.PracSqD > 0 && d > 12 {
 			nn := 0
@@ -2148,7 +2175,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		for _, t := range keep {
 			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
-				return
+				if b.lasSkip(lasWant, lasGo, hGateKeep) {
+					return
+				}
 			}
 		}
 		if (b.P.HitMem > 0 || b.P.LtnObjD > 0) && b.ffaSure && !b.practice && d > 12 {
@@ -2158,7 +2187,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 				if b.P.HitMem > 0 && t.HitMe > 0 && b.t-t.HitMe < b.P.HitMem && db < 220 && db < hyp(px, py, t.Pos[0], t.Pos[1])-5 {
-					return
+					if b.lasSkip(lasWant, lasGo, hGateOther) {
+						return
+					}
 				}
 				if b.P.LtnObjD > 0 && t.has[3] && !t.Ghost && b.t-t.Seen < 20 && db < b.P.LtnObjD && !b.holds("lightning") {
 					return
@@ -2178,7 +2209,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				}
 			}
 			if lanes >= 2 {
-				return
+				if b.lasSkip(lasWant, lasGo, hGateOther) {
+					return
+				}
 			}
 		}
 		if b.hush && (ob.kind == "crate" || ob.kind == "npc" || ob.kind == "npcgo") {
@@ -2192,10 +2225,16 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				dt := hyp(px, py, t.Pos[0], t.Pos[1])
 				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 				if db < 220 && db < dt-5 {
-					return
+
+					if b.lasSkip(lasWant, lasGo, hGateOther) {
+						return
+					}
 				}
 				if dt > 1 && d > dt*0.7 && ((ob.pos[0]-px)*(t.Pos[0]-px)+(ob.pos[1]-py)*(t.Pos[1]-py))/(hyp(ob.pos[0], ob.pos[1], px, py)*dt+1e-9) > 0.7 {
-					return
+
+					if b.lasSkip(lasWant, lasGo, hGateOther) {
+						return
+					}
 				}
 			}
 		}
@@ -2213,6 +2252,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 				b.x10.n[xSilObj]++
 			}
 		}
+		if b.endLow && b.P.EndLowD > 0 && !lowFree && b.corpseFree(&ob) {
+			lowFree = true
+		}
 		if b.endLow && b.P.EndLowD > 0 && !lowFree {
 			switch ob.kind {
 			case "cube", "weapon", "roof", "drop":
@@ -2221,24 +2263,32 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 					lim = b.P.ShyLaserD
 				}
 				if d > lim {
-					return
+					if b.lasSkip(lasWant, lasGo, hGateLow) {
+						return
+					}
 				}
 			default:
 
-				return
+				if b.lasSkip(lasWant, lasGo, hGateLow) {
+					return
+				}
 			}
 		}
 		if b.nearOnly && (d > 35 || (ob.kind != "cube" && ob.kind != "crate")) {
 
 			if !(b.P.RoofBold && !b.practice && (ob.kind == "weapon" || ob.kind == "roof") && d < 70 && !b.holds("laser")) {
-				return
+				if b.lasSkip(lasWant, lasGo, hGateNear) {
+					return
+				}
 			}
 		}
 		if bo := b.boss; bo != nil {
 
 			db := hyp(ob.pos[0], ob.pos[1], bo.Pos[0], bo.Pos[1])
 			if db < b.E.BossObjD || (db < hyp(px, py, bo.Pos[0], bo.Pos[1])-15 && (!b.ffaSure || b.P.BossFarD <= 0 || db < b.P.BossFarD)) {
-				return
+				if b.lasSkip(lasWant, lasGo, hGateBoss) {
+					return
+				}
 			}
 		}
 		shyPen := 0.0
@@ -2265,7 +2315,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 					continue
 				}
 				if db < b.P.QuietObjD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
-					return
+					if b.lasSkip(lasWant, lasGo, hGateQuiet) {
+						return
+					}
 				}
 			}
 			if soft {
@@ -2300,7 +2352,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 					}
 					db := hyp(ob.pos[0], ob.pos[1], n.pos[0], n.pos[1])
 					if db < lim && db < hyp(px, py, n.pos[0], n.pos[1])-8 {
-						return
+						if b.lasSkip(lasWant, lasGo, hGateShy) {
+							return
+						}
 					}
 				}
 			}
@@ -2308,7 +2362,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		if pe := b.peer; pe != nil && b.t-pe.Seen < 8 {
 			db := hyp(ob.pos[0], ob.pos[1], pe.Pos[0], pe.Pos[1])
 			if db < b.P.PeerObjD || db < d-10 {
-				return
+				if b.lasSkip(lasWant, lasGo, hGatePeer) {
+					return
+				}
 			}
 		}
 
@@ -2333,7 +2389,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 
 				eye := [3]float64{bo.Pos[0], bo.Pos[1], bo.Pos[2] + me.Stats.EyeHeight}
 				if b.bodyExposed(eye, ob.pos[0], ob.pos[1], b.w.Ground(ob.pos[0], ob.pos[1])) {
-					return
+					if b.lasSkip(lasWant, lasGo, hGateBoss) {
+						return
+					}
 				}
 			}
 			bs = s
@@ -2368,7 +2426,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			}
 			v += b.E.PileBonus * math.Min(float64(n), 6)
 		}
-		consider(objective{kind: "cube", pos: it.Pos, value: v, item: it})
+		ob := objective{kind: "cube", pos: it.Pos, value: v, item: it}
+		ob.value += b.corpseBonus(&ob)
+		consider(ob)
 	}
 	if b.P.Sites && !b.practice {
 		b.tidySites()
@@ -2376,7 +2436,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			if b.t < st.bad {
 				continue
 			}
-			consider(objective{kind: "site", pos: [3]float64{st.pos[0], st.pos[1], b.w.Ground(st.pos[0], st.pos[1])}, value: st.val, site: st})
+			ob := objective{kind: "site", pos: [3]float64{st.pos[0], st.pos[1], b.w.Ground(st.pos[0], st.pos[1])}, value: st.val, site: st}
+			ob.value += b.corpseBonus(&ob)
+			consider(ob)
 		}
 	}
 	for _, it := range b.pickupL {
@@ -2393,6 +2455,10 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 		}
 		if it.Kind == "laser" && !b.P.NoLaserRush {
 			val = math.Max(val, 270)
+		}
+		if it.Kind == "laser" && b.lasActive() {
+
+			val = math.Max(val, 900)
 		}
 		if it.Roof && math.Abs(it.Pos[2]-me.Pos[2]) > 3 {
 
