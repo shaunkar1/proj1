@@ -36,13 +36,17 @@ type x10state struct {
 	hot    []hotSpot
 	mem    map[int]*memMech
 	deaths []deathAt
+	farmT  float64
+	urgT   float64
 
-	n       [32]int
-	dbgT    float64
-	posRing [32][2]float64
-	posN    int
-	secT    [12]float64
-	maxCube float64
+	n        [40]int
+	dbgT     float64
+	posRing  [32][2]float64
+	posN     int
+	modeRing [32]string
+	modeDs   map[string]int
+	secT     [12]float64
+	maxCube  float64
 }
 
 const (
@@ -77,6 +81,11 @@ const (
 	xFarmShot
 	xLasObj
 	xLowT
+	xFarmBurst
+	xLowFarmWin
+	xLowFirst
+	xLowFirstFarm
+	xSilObj
 )
 
 var X10Debug = os.Getenv("MECH_X10") != ""
@@ -459,6 +468,46 @@ func (b *Bot) farmBlocked(x, y float64) bool {
 	return b.P.FarmClear > 0 && b.x10On() && b.endLow && !b.clearAt(x, y, b.P.FarmClear)
 }
 
+func (b *Bot) silentFree(ob *objective, d float64) bool {
+	if b.P.SilentCollect <= 0 || !b.x10On() || !b.endLow || d > b.P.SilentCollect {
+		return false
+	}
+	lim := b.cubeLimit()
+	if lim <= 0 {
+		lim = b.cfg.Cubes.StatCap
+	}
+	short := b.me.Cubes < lim
+	switch ob.kind {
+	case "cube", "site":
+		if !short {
+			return false
+		}
+	case "roof":
+		if ob.item != nil && b.cubes[ob.item.ID] == ob.item && !short {
+			return false
+		}
+	case "weapon":
+	case "drop":
+		ok := false
+		for i := range b.o.Drops {
+			dr := &b.o.Drops[i]
+			if hyp(dr.Pos[0], dr.Pos[1], ob.pos[0], ob.pos[1]) < 1 && dr.LandsIn <= 0 && (dr.Holder == nil || *dr.Holder == b.me.ID) {
+				ok = true
+			}
+		}
+		if !ok || !short {
+			return false
+		}
+	default:
+		return false
+	}
+	r := b.P.SilentClear
+	if r <= 0 {
+		r = 150
+	}
+	return b.clearAt(b.me.Pos[0], b.me.Pos[1], r) && b.clearAt(ob.pos[0], ob.pos[1], r)
+}
+
 func (b *Bot) laserFree(ob *objective) bool {
 	if b.P.LaserErrand <= 0 || !b.x10On() || ob.item == nil || ob.item.Kind != "laser" || (ob.kind != "weapon" && ob.kind != "roof") || b.holds("laser") {
 		return false
@@ -516,7 +565,7 @@ func (b *Bot) pileYoung(ob *objective) bool {
 	return false
 }
 
-func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action) {
+func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action, farmShot bool) {
 	if !X10Debug || !b.x10On() {
 		return
 	}
@@ -524,12 +573,33 @@ func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action) {
 	px, py := me.Pos[0], me.Pos[1]
 	x := &b.x10
 	act := a.Aim
+	if farmShot {
+		if x.farmT == 0 || b.t-x.farmT > 2 {
+			x.n[xFarmBurst]++
+		}
+		x.farmT = b.t
+	}
+	if b.endLow {
+		if x.farmT > 0 && b.t-x.farmT < 15 {
+			x.n[xLowFarmWin]++
+		}
+	}
 	if b.slot == x10TraceSlot {
 		z := &b.o.Zone
 		fmt.Fprintf(os.Stderr, "XT t=%.1f %s al=%d pos=(%.1f,%.1f,%.1f) v=%.1f en=%.0f hp=%.0f cubes=%.0f in=%v urg=%v goal=(%.0f,%.0f) mv=(%.2f,%.2f) boost=%v jump=%v aim=%.2f->%.2f stuck=%.1f unstick=%.1f path=%d ok=%v zc=%.0f blocked=%d zone=(%.0f,%.0f,%.0f)->(%.0f,%.0f,%.0f) %.0f-%.0f hot=%d mem=%d\n",
 			b.t, b.mode, b.o.Alive, px, py, me.Pos[2], math.Hypot(me.Vel[0], me.Vel[1]), me.Energy, me.HP, me.Cubes, me.InZone, zoneUrgent, b.DbgGoal[0], b.DbgGoal[1],
 			a.Move[0], a.Move[1], a.Boost, a.Jump, me.Aim[0], a.Aim[0], b.stuckT, math.Max(b.unstickT-b.t, 0), len(b.path), b.pathOK, b.zonePathC, len(b.blockedC),
 			z.Center[0], z.Center[1], z.Radius, z.NextCenter[0], z.NextCenter[1], z.NextRadius, z.ShrinkStart, z.ShrinkEnd, len(x.hot), len(x.mem))
+		if zoneUrgent && int(b.t*10)%5 == 0 && len(b.path) > 0 {
+			ps := ""
+			for i, p := range b.path {
+				if i >= 14 {
+					break
+				}
+				ps += fmt.Sprintf(" (%.1f,%.1f,%.1f)", p[0], p[1], b.w.Ground(p[0], p[1]))
+			}
+			fmt.Fprintf(os.Stderr, "XP t=%.1f pathGoal=(%.0f,%.0f) pathT=%.1f cost=%.0f walkable=%v path:%s\n", b.t, b.pathGoal[0], b.pathGoal[1], b.pathT, b.pathCost, b.w.Nav.Walkable(px, py), ps)
+		}
 		if b.P.FarmClear > 0 && int(b.t*10)%20 == 0 {
 			nc, ncl, bd := 0, 0, 1e9
 			for _, c := range b.crateL {
@@ -553,7 +623,18 @@ func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action) {
 		x.maxCube = me.Cubes
 	}
 	x.posRing[x.posN%len(x.posRing)] = [2]float64{px, py}
+	x.modeRing[x.posN%len(x.modeRing)] = b.mode
 	x.posN++
+	if b.endLow {
+		if x.modeDs == nil {
+			x.modeDs = map[string]int{}
+		}
+		k := b.mode
+		if k == "shy" && math.Hypot(me.Vel[0], me.Vel[1]) >= 0.5 {
+			k = "shy-moving"
+		}
+		x.modeDs[k]++
+	}
 	if !me.InZone {
 		x.n[xZoneOut]++
 	}
@@ -599,6 +680,17 @@ func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action) {
 		x.n[xHit]++
 		if first {
 			x.n[xFirst]++
+			fa := -1.0
+			if x.farmT > 0 {
+				fa = b.t - x.farmT
+			}
+			if b.endLow {
+				x.n[xLowFirst]++
+				if fa >= 0 && fa < 15 {
+					x.n[xLowFirstFarm]++
+				}
+			}
+			fmt.Fprintf(os.Stderr, "X10HIT %s %d %d t=%.1f alive=%d low=%v farmAge=%.1f hp=%.0f mode=%s prev=%s\n", b.P.Name, b.seed, b.slot, b.t, b.o.Alive, b.endLow, fa, me.HP, b.mode, x.modeRing[(x.posN+len(x.modeRing)-15)%len(x.modeRing)])
 		}
 		if e.Rear {
 			x.n[xHitRear]++
@@ -621,6 +713,15 @@ func (b *Bot) x10Trace(zoneUrgent bool, a *proto.Action) {
 	}
 	if b.endLow {
 		x.n[xLowT]++
+	}
+	if int(b.t*10)%50 == 0 && len(x.modeDs) > 0 {
+		ms := ""
+		for _, k := range []string{"shy", "shy-moving", "explore", "crate", "npc", "npcgo", "cube", "site", "weapon", "roof", "drop", "grab", "zone", "avoid", "fight", "retreat", "evade", "heal", "flee", "break", "roam"} {
+			if v := x.modeDs[k]; v > 0 {
+				ms += fmt.Sprintf(" %s=%d", k, v)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "X10MODE %s %d %d%s\n", b.P.Name, b.seed, b.slot, ms)
 	}
 	if int(b.t*10)%50 == 0 {
 		las, w2 := 0, 0

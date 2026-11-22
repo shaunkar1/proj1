@@ -542,6 +542,15 @@ func (b *Bot) decide(act *proto.Action) {
 		zoneGo = true
 	}
 	zoneUrgent := zoneGo && (zoneLate || b.zoneAt(b.t+6).outside(px, py) > -3)
+	if b.P.ZoneCommit > 0 && b.x10On() {
+
+		if zoneUrgent {
+			b.x10.urgT = b.t
+		} else if zoneGo && b.x10.urgT > 0 && b.t-b.x10.urgT < b.P.ZoneCommit {
+			zoneUrgent = true
+			b.x10.n[xDither]++
+		}
+	}
 	zoneQuiet := false
 	if b.P.QuietWalk > 0 && b.P.QuietWalkZone && b.ffaSure && !b.practice && zoneGo && !zoneUrgent && b.t > b.P.QuietWalkT {
 
@@ -853,6 +862,11 @@ func (b *Bot) decide(act *proto.Action) {
 		if tgt != nil {
 			ctx.target = tgt
 			ctx.strafe = false
+		}
+		if b.P.ZoneBrave > 0 && b.x10On() && (!me.InZone || b.zoneAt(b.t+b.P.ZoneBrave).outside(px, py) > -3) {
+
+			ctx.brave = true
+			b.x10.n[xFace]++
 		}
 	case zoneQuiet && tgt == nil && nHostile == 0 && !underFire && !b.retreating:
 		mode = "zone"
@@ -1701,7 +1715,7 @@ func (b *Bot) decide(act *proto.Action) {
 	}
 	b.dbg = mode
 	b.e8Trace()
-	b.x10Trace(zoneUrgent, act)
+	b.x10Trace(zoneUrgent, act, farmShot)
 	if Debug && b.P.NoFire {
 		fmt.Fprintf(os.Stderr, "    -> move=(%.2f,%.2f) mode=%s hp=%.0f\n", act.Move[0], act.Move[1], mode, me.HP)
 	}
@@ -2010,6 +2024,9 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			} else if b.laserFree(&ob) {
 				lowFree = true
 				b.x10.n[xLasObj]++
+			} else if b.silentFree(&ob, d) {
+				lowFree = true
+				b.x10.n[xSilObj]++
 			}
 		}
 		if b.endLow && b.P.EndLowD > 0 && !lowFree {

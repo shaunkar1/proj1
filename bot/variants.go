@@ -894,6 +894,48 @@ func Variant(name string) Params {
 		if name == "abcdst" {
 			p.ThreatMem = 45
 		}
+	case "zb3", "zb8", "zbc", "zc2":
+
+		p.FFA0 = "always"
+		switch name {
+		case "zb3":
+			p.ZoneBrave = 3
+		case "zb8":
+			p.ZoneBrave = 8
+		case "zc2":
+			p.ZoneCommit = 2
+		case "zbc":
+			p.ZoneBrave, p.ZoneCommit = 8, 2
+		}
+	case "sc80", "sc120", "sc120lz":
+
+		p.FFA0 = "always"
+		p.SilentCollect, p.PileAge = 120, 30
+		if name == "sc80" {
+			p.SilentCollect = 80
+		}
+		if name == "sc120lz" {
+			p.LaserErrand = 150
+		}
+	case "pa30":
+
+		p.FFA0 = "always"
+		p.PileAge = 30
+	case "abcdz", "zbm", "zbcube":
+
+		p.FFA0 = "always"
+		p.ZoneBrave = 3
+		switch name {
+		case "abcdz":
+			p.HushD, p.HushMem, p.HushLook = 150, 5, true
+			p.FarmClear, p.PileAge, p.FarmScout = 150, 30, 70
+			p.LaserErrand = 150
+			p.CubeCap = 10
+		case "zbm":
+			p.HotR, p.ThreatMem = 130, 20
+		case "zbcube":
+			p.CubeCap = 10
+		}
 	case "cube10", "cube6":
 
 		p.FFA0 = "always"

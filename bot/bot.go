@@ -233,12 +233,16 @@ type Params struct {
 	HotT           float64
 	ThreatMem      float64
 	ThreatMemRatio float64
+	ZoneBrave      float64
+	ZoneCommit     float64
 	HushMem        float64
 	HushLook       bool
 	FarmClear      float64
 	FarmClearT     float64
 	FarmScout      float64
 	PileAge        float64
+	SilentCollect  float64
+	SilentClear    float64
 	LaserErrand    float64
 }
 
