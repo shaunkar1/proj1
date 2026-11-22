@@ -106,6 +106,7 @@ type Params struct {
 	CrossAlive      int     // known free-for-all: with this many mechs or fewer left, skip errands that stand in the open lanes of two laser carriers (0: off)
 	CrossD          float64 // ... counted within this range of the errand
 	ShyMem          float64 // known free-for-all, quiet: how long a mech's last seen position keeps errands away (0: 8 s)
+	FleeLaser       int     // known free-for-all: without a laser, do not duel a laser carrier (1: while quiet, 2: always) unless it is nearly dead
 	EndgameFFA      int     // known free-for-all: after the first death, with this many mechs or fewer left (more than two), only fight back
 	QuietAlive      int     // > 0: quiet time also lasts while more mechs than this are alive (up to 240 s)
 	FFAAfter        int64   // > 0: unix time after which every match is a free-for-all from its first tick (practice scoring is over by then)

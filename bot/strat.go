@@ -544,6 +544,11 @@ func (b *Bot) decide(act *proto.Action) {
 			}
 		}
 		engage = myTTK < er*theirTTK || advOK
+		if b.ffaSure && !b.practice && b.P.FleeLaser > 0 && (b.P.FleeLaser >= 2 || b.quiet) && tgt.has[2] && !b.holds("laser") && myTTK > 2.5 {
+			// recorded matches: hit first by a laser carrier while holding none, 54% of those who shot back
+			// were dead within 10 s (28% of those who did not); those who opened the distance placed a place better
+			engage = false
+		}
 		if nHostile >= 2 && myTTK > 2.5 {
 			engage = engage && myTTK*1.5 < theirTTK
 		}
