@@ -850,7 +850,11 @@ func (b *Bot) decide(act *proto.Action) {
 		ctx.arrive = 8
 	default:
 		ob := (*objective)(nil)
-		hurt := hpFrac < 0.7 && b.t-b.lastDmgT < 40 && len(threats) > 0
+		hurtHP := 0.7
+		if b.P.HurtHP > 0 && b.ffaSure && !b.practice {
+			hurtHP = b.P.HurtHP
+		}
+		hurt := hpFrac < hurtHP && b.t-b.lastDmgT < 40 && len(threats) > 0
 		b.nearOnly = hurt && !b.P.NoRetreatCubes
 		if !hurt || b.nearOnly {
 			ob = b.pickObjective(zEnd, hpFrac, len(mechs) > 0, budget)
@@ -1660,6 +1664,20 @@ func (b *Bot) pickObjective(zEnd zoneC, hpFrac float64, enemiesNear bool, budget
 			db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
 			if db < b.P.KeepAwayD && db < hyp(px, py, t.Pos[0], t.Pos[1])+5 && d > 12 {
 				return
+			}
+		}
+		if (b.P.HitMem > 0 || b.P.LtnObjD > 0) && b.ffaSure && !b.practice && d > 12 {
+			for _, t := range b.trackL {
+				if t.NPC {
+					continue
+				}
+				db := hyp(ob.pos[0], ob.pos[1], t.Pos[0], t.Pos[1])
+				if b.P.HitMem > 0 && t.HitMe > 0 && b.t-t.HitMe < b.P.HitMem && db < 220 && db < hyp(px, py, t.Pos[0], t.Pos[1])-5 {
+					return
+				}
+				if b.P.LtnObjD > 0 && t.has[3] && !t.Ghost && b.t-t.Seen < 20 && db < b.P.LtnObjD && !b.holds("lightning") {
+					return
+				}
 			}
 		}
 		if b.P.CrossAlive > 0 && b.ffaSure && !b.practice && b.o.Alive <= b.P.CrossAlive && d > 12 {

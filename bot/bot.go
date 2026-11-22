@@ -109,6 +109,9 @@ type Params struct {
 	FleeLaser       int     // known free-for-all: without a laser, do not duel a laser carrier (1: while quiet, 2: always) unless it is nearly dead
 	QuietNoClose    bool    // known free-for-all, quiet phase: fight from where we stand or further, never walk in (unless finishing)
 	SafeAway        float64 // known free-for-all: cover spots are penalised by this much per metre they bring us nearer a hostile (0: off)
+	HurtHP          float64 // known free-for-all: below this health fraction (and hit in the last 40 s with a threat around) only nearby errands; 0 = the usual 0.7
+	HitMem          float64 // known free-for-all: for this many seconds after a mech hit us, no errand that ends closer to it
+	LtnObjD         float64 // known free-for-all: no errand that ends within this distance of a lightning holder (unless we hold lightning)
 	LateStrike      int     // known free-for-all, patient phase: with this many or fewer alive, a laser and plenty of health, fire first on a lone mech that is not stronger (0 = never)
 	LateStrikeD     float64 // ... within this distance
 	LateStrikeHP    float64 // ... when our health fraction is at least this
